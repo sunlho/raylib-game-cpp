@@ -1,0 +1,85 @@
+﻿#include <array>
+
+#include "Rendering.h"
+
+Rendering::Rendering(flecs::world &world) {
+
+  std::array RenderPhases = {
+      world.entity<RenderPhases::PreDraw>(),
+      world.entity<RenderPhases::Background>(),
+      world.entity<RenderPhases::Draw>(),
+      world.entity<RenderPhases::PostDraw>()};
+
+  flecs::entity_t PriorPhase = flecs::OnStore;
+
+  for (auto &Phase : RenderPhases) {
+    Phase.add(flecs::Phase).depends_on(PriorPhase);
+    PriorPhase = Phase;
+  }
+
+  // Reflection::Register<Position>(world);
+  // Reflection::Register<Circle>(world);
+
+  // Reflection::Register<WindowTitle>(world);
+  // Reflection::Register<WindowSize>(world);
+  // Reflection::Register<WindowFPS>(world);
+
+  world.observer<const WindowTitle>("Update Window Title")
+      .event(flecs::OnSet)
+      .each([](const WindowTitle &title) {
+        if (IsWindowReady()) {
+          SetWindowTitle(title.value.c_str());
+        }
+      });
+  world.observer<WindowSize>("Update Window Size")
+      .event(flecs::OnSet)
+      .each([](const WindowSize &size) {
+        if (IsWindowReady()) {
+          SetWindowSize(size.dimension.x, size.dimension.y);
+        }
+      });
+  world.observer<WindowFPS>("Update Target FPS")
+      .event(flecs::OnSet)
+      .each([](const WindowFPS &fps) {
+        if (IsWindowReady()) {
+          SetTargetFPS(fps.target);
+        }
+      });
+  world.system<const WindowTitle, const WindowSize, const WindowFPS>("InitializeWindow")
+      .kind(flecs::OnStart)
+      .each([](const WindowTitle &title, const WindowSize &size, const WindowFPS &fps) {
+        InitWindow(size.dimension.x, size.dimension.y, title.value.c_str());
+        SetTargetFPS(fps.target);
+      });
+
+  world.system("BeginDrawing")
+      .kind<RenderPhases::PreDraw>()
+      .run([](flecs::iter &it) {
+        BeginDrawing();
+        ClearBackground(BLACK);
+      });
+  world.system("EndDraw")
+      .kind<RenderPhases::PostDraw>()
+      .run([](flecs::iter &it) {
+        DrawFPS(GetScreenWidth() - 100, 10);
+        EndDrawing();
+      });
+
+  world.system<const Position, const RenderComponent>("Draw Renderables")
+      .kind<RenderPhases::Draw>()
+      .each([](const Position &p, const RenderComponent &renderable) {
+        if (!renderable.visible || !renderable.object) {
+          return;
+        }
+
+        renderable.object->Draw(p);
+      });
+
+  world.system("Check Exit Request")
+      .kind(flecs::PostFrame)
+      .run([](flecs::iter &it) {
+        if (WindowShouldClose()) {
+          it.world().quit();
+        }
+      });
+}

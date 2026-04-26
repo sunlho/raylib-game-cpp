@@ -1,0 +1,13 @@
+
+[requires]
+tmxlite/1.4.4
+flecs/4.1.1
+box2d/3.1.1
+libwebp/1.6.0
+
+[generators]
+CMakeDeps
+CMakeToolchain
+
+[layout]
+cmake_layout

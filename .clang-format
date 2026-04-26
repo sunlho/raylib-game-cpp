@@ -1,0 +1,8 @@
+ColumnLimit: 0
+AllowAllParametersOfDeclarationOnNextLine: false
+BinPackArguments: false
+BinPackParameters: false
+
+KeepEmptyLinesAtTheStartOfBlocks: true
+IndentWidth: 2
+TabWidth: 2
