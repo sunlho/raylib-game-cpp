@@ -18,12 +18,12 @@ void Rendering::Import(flecs::world &world) {
     PriorPhase = Phase;
   }
 
-  // Reflection::Register<Position>(world);
+  Reflection::Register<Position>(world);
   // Reflection::Register<Circle>(world);
 
-  // Reflection::Register<WindowTitle>(world);
-  // Reflection::Register<WindowSize>(world);
-  // Reflection::Register<WindowFPS>(world);
+  Reflection::Register<WindowTitle>(world);
+  Reflection::Register<WindowSize>(world);
+  Reflection::Register<WindowFPS>(world);
 
   world.observer<const WindowTitle>("Update Window Title")
       .event(flecs::OnSet)

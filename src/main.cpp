@@ -4,6 +4,7 @@
 #include <memory>
 
 #include "modules/Camera.h"
+#include "modules/Movement.h"
 #include "modules/Rendering.h"
 #include "modules/Tilemap/Tilemap.h"
 
@@ -14,8 +15,9 @@ int main() {
   flecs::world world;
   world.set<flecs::Rest>({});
 
-  GameCamera::Import(world);
   Rendering::Import(world);
+  Movement::Import(world);
+  GameCamera::Import(world);
   Tilemap::Import(world);
 
   world.component<Rendering::MainWindow>()
@@ -38,6 +40,17 @@ int main() {
 
   world.entity("tilemap")
       .set<Tilemap::TilemapPath>({"Map.tmx"});
+
+  world.entity("player")
+      .add<Movement::PlayerControlled>()
+      .add<Movement::CameraFollowTag>()
+      .set<Rendering::Position>({Vector2{128.0f, 128.0f}})
+      .set<Movement::Velocity>({Vector2{0.0f, 0.0f}})
+      .set<Movement::MoveSpeed>({160.0f})
+      .set<Rendering::RenderComponent>({
+          std::make_shared<Rendering::CircleRenderable>(LIME, 8.0f),
+          true,
+      });
 
   while (world.progress(GetFrameTime())) {
   }
