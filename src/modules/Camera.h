@@ -1,0 +1,26 @@
+#pragma once
+
+#include "flecs.h"
+#include "raylib.h"
+
+namespace GameCamera {
+struct Phases {
+  struct Begin2D {};
+  struct End2D {};
+};
+
+struct MainCamera {};
+
+struct CameraState {
+  Camera2D value = {
+      Vector2{0.0f, 0.0f},
+      Vector2{0.0f, 0.0f},
+      0.0f,
+      1.0f};
+  bool enabled = true;
+  bool autoCenterOffset = true;
+};
+
+void Import(flecs::world &world);
+
+} // namespace GameCamera

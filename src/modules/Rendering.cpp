@@ -1,18 +1,19 @@
 ﻿#include <array>
 
+#include "Reflection.h"
 #include "Rendering.h"
 
-Rendering::Rendering(flecs::world &world) {
+void Rendering::Import(flecs::world &world) {
 
-  std::array RenderPhases = {
-      world.entity<RenderPhases::PreDraw>(),
-      world.entity<RenderPhases::Background>(),
-      world.entity<RenderPhases::Draw>(),
-      world.entity<RenderPhases::PostDraw>()};
+  std::array Phases = {
+      world.entity<Phases::PreDraw>(),
+      world.entity<Phases::Background>(),
+      world.entity<Phases::Draw>(),
+      world.entity<Phases::PostDraw>()};
 
   flecs::entity_t PriorPhase = flecs::OnStore;
 
-  for (auto &Phase : RenderPhases) {
+  for (auto &Phase : Phases) {
     Phase.add(flecs::Phase).depends_on(PriorPhase);
     PriorPhase = Phase;
   }
@@ -53,20 +54,20 @@ Rendering::Rendering(flecs::world &world) {
       });
 
   world.system("BeginDrawing")
-      .kind<RenderPhases::PreDraw>()
+      .kind<Phases::PreDraw>()
       .run([](flecs::iter &it) {
         BeginDrawing();
         ClearBackground(BLACK);
       });
   world.system("EndDraw")
-      .kind<RenderPhases::PostDraw>()
+      .kind<Phases::PostDraw>()
       .run([](flecs::iter &it) {
         DrawFPS(GetScreenWidth() - 100, 10);
         EndDrawing();
       });
 
   world.system<const Position, const RenderComponent>("Draw Renderables")
-      .kind<RenderPhases::Draw>()
+      .kind<Phases::Draw>()
       .each([](const Position &p, const RenderComponent &renderable) {
         if (!renderable.visible || !renderable.object) {
           return;

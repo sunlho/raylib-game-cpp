@@ -1,50 +1,17 @@
-#include "flecs.h"
-#include "raylib.h"
-#include "tmxlite/Map.hpp"
-#include "tmxlite/ObjectGroup.hpp"
-#include "tmxlite/TileLayer.hpp"
+#include "TilemapInternal.h"
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <utility>
-#include <vector>
 
-#include "Assets.h"
-#include "Tilemap.h"
-
-namespace {
-
-struct TilemapTilesetTexture {
-  Texture2D texture = {0};
-  std::uint32_t firstGid = 0;
-  std::uint32_t lastGid = 0;
-  int tileWidth = 0;
-  int tileHeight = 0;
-  int columnCount = 0;
-  int spacing = 0;
-  int margin = 0;
-};
-
-struct TilemapTextureBank {
-  std::vector<TilemapTilesetTexture> tilesets;
-
-  ~TilemapTextureBank() {
-    for (auto &tileset : tilesets) {
-      if (tileset.texture.id != 0) {
-        UnloadTexture(tileset.texture);
-        tileset.texture = Texture2D{};
-      }
-    }
-  }
-};
+namespace TilemapInternal {
 
 class ChunkRenderable final : public Rendering::Renderable {
 public:
-  ChunkRenderable(std::vector<Tilemap::ChunkTile> tiles,
-                  std::shared_ptr<TilemapTextureBank> textureBank)
-      : tiles_(std::move(tiles)), textureBank_(std::move(textureBank)) {
+  ChunkRenderable(std::vector<Tilemap::ChunkTile> tiles, std::shared_ptr<TilemapTextureBank> textureBank) : tiles_(std::move(tiles)), textureBank_(std::move(textureBank)) {
   }
 
   void Draw(const Rendering::Position &position) const override {
@@ -79,93 +46,15 @@ private:
   std::shared_ptr<TilemapTextureBank> textureBank_;
 };
 
-constexpr std::uint32_t TMX_FLIP_BITS_REMOVAL = 0x1FFFFFFFU;
-
-static int CeilDiv(int value, int divisor) {
+int CeilDiv(int value, int divisor) {
   return (value + divisor - 1) / divisor;
 }
 
-static std::uint64_t MakeChunkKey(int chunkX, int chunkY) {
+std::uint64_t MakeChunkKey(int chunkX, int chunkY) {
   return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(chunkX)) << 32U) | static_cast<std::uint32_t>(chunkY);
 }
 
-static int FindTilesetIndexByGid(const TilemapTextureBank &textureBank, std::uint32_t gid) {
-  for (std::size_t i = 0; i < textureBank.tilesets.size(); ++i) {
-    const auto &tileset = textureBank.tilesets[i];
-    if (gid >= tileset.firstGid && gid <= tileset.lastGid) {
-      return static_cast<int>(i);
-    }
-  }
-
-  return -1;
-}
-
-static Rectangle ComputeSourceRect(const TilemapTilesetTexture &tileset, std::uint32_t gid) {
-  const std::uint32_t localId = gid - tileset.firstGid;
-
-  if (tileset.columnCount <= 0) {
-    return Rectangle{0, 0, 0, 0};
-  }
-
-  const int column = static_cast<int>(localId % static_cast<std::uint32_t>(tileset.columnCount));
-  const int row = static_cast<int>(localId / static_cast<std::uint32_t>(tileset.columnCount));
-
-  const int stepX = tileset.tileWidth + tileset.spacing;
-  const int stepY = tileset.tileHeight + tileset.spacing;
-
-  return Rectangle{
-      static_cast<float>(tileset.margin + column * stepX),
-      static_cast<float>(tileset.margin + row * stepY),
-      static_cast<float>(tileset.tileWidth),
-      static_cast<float>(tileset.tileHeight)};
-}
-
-static std::shared_ptr<TilemapTextureBank> LoadTilesetTextures(const tmx::Map &tilemap,
-                                                               const std::string &mapRelativePath) {
-  auto textureBank = std::make_shared<TilemapTextureBank>();
-  const auto &tilesets = tilemap.getTilesets();
-  textureBank->tilesets.reserve(tilesets.size());
-
-  for (std::size_t i = 0; i < tilesets.size(); ++i) {
-    const auto &tileset = tilesets[i];
-    const auto imagePath = tileset.getImagePath();
-
-    if (imagePath.empty()) {
-      TraceLog(LOG_WARNING, "Tileset[%d] has empty image path, skip", static_cast<int>(i));
-      continue;
-    }
-
-    const auto mapDir = std::filesystem::path(mapRelativePath).parent_path();
-    const auto textureRelative = (mapDir / imagePath).lexically_normal().generic_string();
-    const auto texturePath = Assets::Path(textureRelative);
-
-    if (!Assets::Exists(textureRelative)) {
-      TraceLog(LOG_WARNING, "Tileset image not found: %s", texturePath.string().c_str());
-      continue;
-    }
-
-    TilemapTilesetTexture loaded;
-    loaded.texture = LoadTexture(texturePath.string().c_str());
-    loaded.firstGid = tileset.getFirstGID();
-    loaded.lastGid = tileset.getFirstGID() + tileset.getTileCount() - 1;
-    loaded.tileWidth = static_cast<int>(tileset.getTileSize().x);
-    loaded.tileHeight = static_cast<int>(tileset.getTileSize().y);
-    loaded.columnCount = static_cast<int>(tileset.getColumnCount());
-    loaded.spacing = static_cast<int>(tileset.getSpacing());
-    loaded.margin = static_cast<int>(tileset.getMargin());
-
-    textureBank->tilesets.push_back(loaded);
-  }
-
-  return textureBank;
-}
-
-static flecs::entity CreateChunkEntity(flecs::world &world,
-                                       Tilemap::Chunk chunk,
-                                       float sortY,
-                                       bool isObject,
-                                       std::shared_ptr<TilemapTextureBank> textureBank,
-                                       Tilemap::ChunkIndex &chunkIndex) {
+flecs::entity CreateChunkEntity(flecs::world &world, Tilemap::Chunk chunk, float sortY, bool isObject, std::shared_ptr<TilemapTextureBank> textureBank, Tilemap::ChunkIndex &chunkIndex) {
   const int chunkX = chunk.chunkX;
   const int chunkY = chunk.chunkY;
   const Rectangle chunkRect = chunk.destRect;
@@ -205,12 +94,7 @@ static flecs::entity CreateChunkEntity(flecs::world &world,
   return chunkEntity;
 }
 
-static void BuildLayerChunks(flecs::world &world,
-                             const tmx::Map &tilemap,
-                             const tmx::TileLayer &layer,
-                             int layerIndex,
-                             const std::shared_ptr<TilemapTextureBank> &textureBank,
-                             Tilemap::ChunkIndex &chunkIndex) {
+void BuildLayerChunks(flecs::world &world, const tmx::Map &tilemap, const tmx::TileLayer &layer, int layerIndex, const std::shared_ptr<TilemapTextureBank> &textureBank, Tilemap::ChunkIndex &chunkIndex) {
   const auto mapTileCount = tilemap.getTileCount();
   const auto mapTileSize = tilemap.getTileSize();
   const auto &allTiles = layer.getTiles();
@@ -285,12 +169,7 @@ static void BuildLayerChunks(flecs::world &world,
   }
 }
 
-static void BuildObjectChunks(flecs::world &world,
-                              const tmx::Map &tilemap,
-                              const tmx::ObjectGroup &objectGroup,
-                              int layerIndex,
-                              const std::shared_ptr<TilemapTextureBank> &textureBank,
-                              Tilemap::ChunkIndex &chunkIndex) {
+void BuildObjectChunks(flecs::world &world, const tmx::Map &tilemap, const tmx::ObjectGroup &objectGroup, int layerIndex, const std::shared_ptr<TilemapTextureBank> &textureBank, Tilemap::ChunkIndex &chunkIndex) {
   const auto mapTileSize = tilemap.getTileSize();
   const float mapChunkWidth = static_cast<float>(Tilemap::CHUNK_SIZE * static_cast<int>(mapTileSize.x));
   const float mapChunkHeight = static_cast<float>(Tilemap::CHUNK_SIZE * static_cast<int>(mapTileSize.y));
@@ -337,57 +216,4 @@ static void BuildObjectChunks(flecs::world &world,
   }
 }
 
-} // namespace
-
-Tilemap::Tilemap(flecs::world &world) {
-  world.component<ChunkTile>();
-  world.component<ChunkAnimFrame>();
-  world.component<ChunkAnimTile>();
-  world.component<Chunk>();
-  world.component<ChunkDrawable>();
-  world.component<ChunkObject>();
-  world.component<ChunkIndex>()
-      .add(flecs::Singleton);
-  world.set<ChunkIndex>({});
-
-  world.system<const TilemapPath>("Load Tilemap")
-      .kind(flecs::OnStart)
-      .each([&world](const TilemapPath &map) {
-        const auto mapPath = Assets::Path(map.value);
-
-        if (!Assets::Exists(map.value)) {
-          TraceLog(LOG_WARNING, "Tilemap file not found: %s", mapPath.string().c_str());
-          return;
-        }
-
-        tmx::Map tilemap;
-        if (!tilemap.load(mapPath.string())) {
-          TraceLog(LOG_WARNING, "Failed to load tilemap: %s", mapPath.string().c_str());
-          return;
-        }
-
-        auto &chunkIndex = world.get_mut<ChunkIndex>();
-
-        auto textureBank = LoadTilesetTextures(tilemap, map.value);
-
-        int layerIndex = 0;
-        for (const auto &layer : tilemap.getLayers()) {
-          if (!layer || layer->getType() != tmx::Layer::Type::Tile) {
-            if (layer && layer->getType() == tmx::Layer::Type::Object) {
-              const auto &objectGroup = layer->getLayerAs<tmx::ObjectGroup>();
-              BuildObjectChunks(world, tilemap, objectGroup, layerIndex, textureBank, chunkIndex);
-            }
-
-            layerIndex++;
-            continue;
-          }
-
-          const auto &tileLayer = layer->getLayerAs<tmx::TileLayer>();
-          BuildLayerChunks(world, tilemap, tileLayer, layerIndex, textureBank, chunkIndex);
-          layerIndex++;
-        }
-
-        world.modified<ChunkIndex>();
-        TraceLog(LOG_INFO, "Tilemap loaded and chunked from: %s", mapPath.string().c_str());
-      });
-}
+} // namespace TilemapInternal
