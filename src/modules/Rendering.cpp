@@ -1,9 +1,16 @@
-﻿#include <array>
+#include <array>
 
 #include "Reflection.h"
 #include "Rendering.h"
 
 void Rendering::Import(flecs::world &world) {
+
+  Reflection::Register<Position>(world);
+  Reflection::Register<RenderComponent>(world);
+
+  Reflection::Register<WindowTitle>(world);
+  Reflection::Register<WindowSize>(world);
+  Reflection::Register<WindowFPS>(world);
 
   std::array Phases = {
       world.entity<Phases::PreDraw>(),
@@ -17,13 +24,6 @@ void Rendering::Import(flecs::world &world) {
     Phase.add(flecs::Phase).depends_on(PriorPhase);
     PriorPhase = Phase;
   }
-
-  Reflection::Register<Position>(world);
-  // Reflection::Register<Circle>(world);
-
-  Reflection::Register<WindowTitle>(world);
-  Reflection::Register<WindowSize>(world);
-  Reflection::Register<WindowFPS>(world);
 
   world.observer<const WindowTitle>("Update Window Title")
       .event(flecs::OnSet)

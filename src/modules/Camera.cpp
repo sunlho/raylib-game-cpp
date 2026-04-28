@@ -1,8 +1,12 @@
 #include "Camera.h"
 
+#include "Reflection.h"
 #include "Rendering.h"
 
 void GameCamera::Import(flecs::world &world) {
+
+  Reflection::Register<CameraState>(world);
+
   auto beginPhase = world.entity<GameCamera::Phases::Begin2D>();
   auto endPhase = world.entity<GameCamera::Phases::End2D>();
 

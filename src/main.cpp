@@ -1,10 +1,11 @@
+#include <memory>
+
 #include "flecs.h"
 #include "raylib.h"
 
-#include <memory>
-
 #include "modules/Camera.h"
 #include "modules/Movement.h"
+#include "modules/Reflection.h"
 #include "modules/Rendering.h"
 #include "modules/Tilemap/Tilemap.h"
 
@@ -14,6 +15,11 @@
 int main() {
   flecs::world world;
   world.set<flecs::Rest>({});
+  world.import<flecs::stats>();
+
+  // world.component<Vector2>();
+  Reflection::Register<Rectangle>(world);
+  Reflection::Register<RenderTexture2D>(world);
 
   Rendering::Import(world);
   Movement::Import(world);

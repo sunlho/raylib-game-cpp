@@ -1,17 +1,21 @@
 #include "Tilemap.h"
 #include "TilemapInternal.h"
+
 #include "modules/Assets.h"
+#include "modules/Reflection.h"
 
 void Tilemap::Import(flecs::world &world) {
-  world.component<ChunkTile>();
-  world.component<ChunkAnimFrame>();
-  world.component<ChunkAnimTile>();
-  world.component<Chunk>();
-  world.component<ChunkDrawable>();
-  world.component<ChunkObject>();
+  Reflection::Register<ChunkTile>(world);
+  Reflection::Register<ChunkAnimFrame>(world);
+  Reflection::Register<ChunkAnimTile>(world);
+  Reflection::Register<Chunk>(world);
+  Reflection::Register<ChunkDrawable>(world);
+  Reflection::Register<ChunkObject>(world);
   world.component<ChunkIndex>()
       .add(flecs::Singleton);
   world.set<ChunkIndex>({});
+
+  Reflection::Register<TilemapPath>(world);
 
   world.system<const TilemapPath>("Load Tilemap")
       .kind(flecs::OnStart)

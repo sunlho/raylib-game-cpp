@@ -1,10 +1,15 @@
 #include "Movement.h"
 
 #include "Camera.h"
+#include "Reflection.h"
 #include "Rendering.h"
 #include "raymath.h"
 
 void Movement::Import(flecs::world &world) {
+
+  Reflection::Register<Velocity>(world);
+  Reflection::Register<MoveSpeed>(world);
+
   auto updatePhase = world.entity<Movement::Phases::Update>();
   auto followPhase = world.entity<Movement::Phases::CameraFollow>();
 
