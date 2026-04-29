@@ -53,6 +53,11 @@ void Movement::Import(flecs::world &world) {
       .each([&world](const Rendering::Position &position) {
         auto mainCamera = world.singleton<GameCamera::MainCamera>();
         auto &cameraState = mainCamera.get_mut<GameCamera::CameraState>();
-        cameraState.value.target = position.value;
+        Vector2 target = position.value;
+
+        target.x = roundf(target.x);
+        target.y = roundf(target.y);
+
+        cameraState.value.target = target;
       });
 }

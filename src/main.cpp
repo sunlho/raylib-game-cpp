@@ -52,11 +52,7 @@ int main() {
       .add<Movement::CameraFollowTag>()
       .set<Rendering::Position>({Vector2{128.0f, 128.0f}})
       .set<Movement::Velocity>({Vector2{0.0f, 0.0f}})
-      .set<Movement::MoveSpeed>({160.0f})
-      .set<Rendering::RenderComponent>({
-          std::make_shared<Rendering::CircleRenderable>(LIME, 8.0f),
-          true,
-      });
+      .set<Movement::MoveSpeed>({160.0f});
 
   while (world.progress(GetFrameTime())) {
   }
