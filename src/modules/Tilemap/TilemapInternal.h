@@ -40,10 +40,10 @@ Rectangle ComputeSourceRect(const TilemapTilesetTexture &tileset, std::uint32_t 
 
 std::shared_ptr<TilemapTextureBank> LoadTilesetTextures(const tmx::Map &tilemap, const std::string &mapRelativePath);
 
-flecs::entity CreateChunkEntity(flecs::world &world, Tilemap::Chunk chunk, float sortY, bool isObject, std::shared_ptr<TilemapTextureBank> textureBank, Tilemap::ChunkIndex &chunkIndex);
+flecs::entity CreateChunkEntity(flecs::world &world, Tilemap::Chunk chunk, float sortY, bool isObject, flecs::entity layerGroup, std::shared_ptr<TilemapTextureBank> textureBank, Tilemap::ChunkIndex &chunkIndex);
 
-void BuildLayerChunks(flecs::world &world, const tmx::Map &tilemap, const tmx::TileLayer &layer, int layerIndex, const std::shared_ptr<TilemapTextureBank> &textureBank, Tilemap::ChunkIndex &chunkIndex);
+void BuildLayerChunks(flecs::world &world, const tmx::Map &tilemap, const tmx::TileLayer &layer, int layerIndex, flecs::entity layerGroup, const std::shared_ptr<TilemapTextureBank> &textureBank, Tilemap::ChunkIndex &chunkIndex);
 
-void BuildObjectChunks(flecs::world &world, const tmx::Map &tilemap, const tmx::ObjectGroup &objectGroup, int layerIndex, const std::shared_ptr<TilemapTextureBank> &textureBank, Tilemap::ChunkIndex &chunkIndex);
+void BuildObjectChunks(flecs::world &world, const tmx::Map &tilemap, const tmx::ObjectGroup &objectGroup, int layerIndex, flecs::entity layerGroup, const std::shared_ptr<TilemapTextureBank> &textureBank, Tilemap::ChunkIndex &chunkIndex);
 
 } // namespace TilemapInternal

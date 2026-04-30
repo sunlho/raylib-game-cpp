@@ -18,7 +18,6 @@ int main() {
   world.set<flecs::Rest>({});
   world.import<flecs::stats>();
 
-  // world.component<Vector2>();
   Reflection::Register<Rectangle>(world);
   Reflection::Register<RenderTexture2D>(world);
 
@@ -37,11 +36,7 @@ int main() {
   world.component<GameCamera::MainCamera>()
       .add(flecs::Singleton)
       .set<GameCamera::CameraState>({
-          Camera2D{
-              Vector2{0.0f, 0.0f},
-              Vector2{0.0f, 0.0f},
-              0.0f,
-              2.0f},
+          Camera2D{Vector2{0.0f, 0.0f}, Vector2{0.0f, 0.0f}, 0.0f, 2.0f},
           true,
           true,
       });
@@ -79,17 +74,13 @@ int main() {
       .set<Movement::Velocity>({Vector2{0.0f, 0.0f}})
       .set<Movement::MoveSpeed>({120.0f});
 
-  world.entity("npc")
-      .add<Character::NPCTag>()
-      .set<Character::CharacterInfo>({"NPC", Character::CharacterState::Idle, Character::CharacterDirection::Down})
-      .set<Character::CharacterStats>({60.0f, 60.0f, 6.0f, 1.0f})
-      .set<Rendering::Position>({Vector2{256.0f, 160.0f}});
-
   while (world.progress(GetFrameTime())) {
     if (WindowShouldClose()) {
       break;
     }
   }
+
+  world.quit();
 
   return 0;
 }

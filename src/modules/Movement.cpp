@@ -50,7 +50,8 @@ void Movement::Import(flecs::world &world) {
   world.system<const Rendering::Position>("Follow Camera Target")
       .with<CameraFollowTag>()
       .kind<Movement::Phases::CameraFollow>()
-      .each([&world](const Rendering::Position &position) {
+      .each([](flecs::iter &it, size_t i, const Rendering::Position &position) {
+        auto world = it.world();
         auto mainCamera = world.singleton<GameCamera::MainCamera>();
         auto &cameraState = mainCamera.get_mut<GameCamera::CameraState>();
         Vector2 target = position.value;

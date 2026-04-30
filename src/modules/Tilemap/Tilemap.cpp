@@ -19,7 +19,8 @@ void Tilemap::Import(flecs::world &world) {
 
   world.system<const TilemapPath>("Load Tilemap")
       .kind(flecs::OnStart)
-      .each([&world](const TilemapPath &map) {
+      .each([](flecs::iter &it, size_t i, const TilemapPath &map) {
+        auto world = it.world();
         const auto mapPath = Assets::Path(map.value);
 
         if (!Assets::Exists(map.value)) {
@@ -39,10 +40,14 @@ void Tilemap::Import(flecs::world &world) {
 
         int layerIndex = 0;
         for (const auto &layer : tilemap.getLayers()) {
+          const auto layerName = layer ? layer->getName() : std::string();
+          const auto layerGroupName = layerName.empty() ? (std::string("TilemapLayer_") + std::to_string(layerIndex)) : (layerName + "_" + std::to_string(layerIndex));
+          auto layerGroup = world.entity(layerGroupName.c_str());
+
           if (!layer || layer->getType() != tmx::Layer::Type::Tile) {
             if (layer && layer->getType() == tmx::Layer::Type::Object) {
               const auto &objectGroup = layer->getLayerAs<tmx::ObjectGroup>();
-              TilemapInternal::BuildObjectChunks(world, tilemap, objectGroup, layerIndex, textureBank, chunkIndex);
+              TilemapInternal::BuildObjectChunks(world, tilemap, objectGroup, layerIndex, layerGroup, textureBank, chunkIndex);
             }
 
             layerIndex++;
@@ -50,7 +55,7 @@ void Tilemap::Import(flecs::world &world) {
           }
 
           const auto &tileLayer = layer->getLayerAs<tmx::TileLayer>();
-          TilemapInternal::BuildLayerChunks(world, tilemap, tileLayer, layerIndex, textureBank, chunkIndex);
+          TilemapInternal::BuildLayerChunks(world, tilemap, tileLayer, layerIndex, layerGroup, textureBank, chunkIndex);
           layerIndex++;
         }
 

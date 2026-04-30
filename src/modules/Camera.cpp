@@ -24,15 +24,16 @@ void GameCamera::Import(flecs::world &world) {
 
   world.system("Auto Center Camera Offset")
       .kind<GameCamera::Phases::Begin2D>()
-      .run([&world](flecs::iter &) {
+      .run([](flecs::iter &it) {
+        const auto &world = it.world();
         auto cameraEntity = world.singleton<GameCamera::MainCamera>();
         auto &cameraState = cameraEntity.get_mut<GameCamera::CameraState>();
         if (!cameraState.autoCenterOffset) {
           return;
         }
 
-        auto windowEntity = world.singleton<Rendering::MainWindow>();
-        const auto &windowSize = windowEntity.get<Rendering::WindowSize>();
+        auto mainWindow = world.singleton<Rendering::MainWindow>();
+        const auto &windowSize = mainWindow.get<Rendering::WindowSize>();
 
         cameraState.value.offset = Vector2{
             windowSize.dimension.x * 0.5f,

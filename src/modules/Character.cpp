@@ -57,7 +57,7 @@ std::string BuildAnimationKey(CharacterState state, CharacterDirection direction
 }
 
 AnimationClip *FindClip(AnimationController &controller, std::string_view name) {
-  const auto it = std::find_if(controller.clips.begin(), controller.clips.end(), [&](const AnimationClip &clip) {
+  const auto it = std::find_if(controller.clips.begin(), controller.clips.end(), [name](const AnimationClip &clip) {
     return clip.name == name;
   });
   if (it == controller.clips.end()) {
@@ -157,7 +157,7 @@ void AnimationController::AddAnimation(AnimationClip clip) {
 }
 
 bool AnimationController::PlayAnimation(std::string_view name, bool restart) {
-  const auto it = std::find_if(clips.begin(), clips.end(), [&](const AnimationClip &clip) {
+  const auto it = std::find_if(clips.begin(), clips.end(), [name](const AnimationClip &clip) {
     return clip.name == name;
   });
   if (it == clips.end()) {
@@ -183,7 +183,7 @@ const AnimationClip *AnimationController::GetCurrentAnimation() const {
 }
 
 const SpriteEntry *SpriteSet::FindEntry(std::string_view name) const {
-  const auto it = std::find_if(entries.begin(), entries.end(), [&](const SpriteEntry &entry) {
+  const auto it = std::find_if(entries.begin(), entries.end(), [name](const SpriteEntry &entry) {
     return entry.name == name;
   });
   if (it == entries.end()) {
@@ -194,7 +194,7 @@ const SpriteEntry *SpriteSet::FindEntry(std::string_view name) const {
 }
 
 SpriteEntry *SpriteSet::FindEntry(std::string_view name) {
-  const auto it = std::find_if(entries.begin(), entries.end(), [&](const SpriteEntry &entry) {
+  const auto it = std::find_if(entries.begin(), entries.end(), [name](const SpriteEntry &entry) {
     return entry.name == name;
   });
   if (it == entries.end()) {

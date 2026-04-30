@@ -54,7 +54,7 @@ std::uint64_t MakeChunkKey(int chunkX, int chunkY) {
   return (static_cast<std::uint64_t>(static_cast<std::uint32_t>(chunkX)) << 32U) | static_cast<std::uint32_t>(chunkY);
 }
 
-flecs::entity CreateChunkEntity(flecs::world &world, Tilemap::Chunk chunk, float sortY, bool isObject, std::shared_ptr<TilemapTextureBank> textureBank, Tilemap::ChunkIndex &chunkIndex) {
+flecs::entity CreateChunkEntity(flecs::world &world, Tilemap::Chunk chunk, float sortY, bool isObject, flecs::entity layerGroup, std::shared_ptr<TilemapTextureBank> textureBank, Tilemap::ChunkIndex &chunkIndex) {
   const int chunkX = chunk.chunkX;
   const int chunkY = chunk.chunkY;
   const Rectangle chunkRect = chunk.destRect;
@@ -82,6 +82,10 @@ flecs::entity CreateChunkEntity(flecs::world &world, Tilemap::Chunk chunk, float
       .set<Rendering::Position>(chunkDrawable.position)
       .set<Rendering::RenderComponent>(chunkDrawable.render);
 
+  if (layerGroup.is_valid()) {
+    chunkEntity.add(flecs::ChildOf, layerGroup);
+  }
+
   chunkIndex.allChunkEntities.push_back(chunkEntity.id());
 
   if (isObject) {
@@ -94,7 +98,7 @@ flecs::entity CreateChunkEntity(flecs::world &world, Tilemap::Chunk chunk, float
   return chunkEntity;
 }
 
-void BuildLayerChunks(flecs::world &world, const tmx::Map &tilemap, const tmx::TileLayer &layer, int layerIndex, const std::shared_ptr<TilemapTextureBank> &textureBank, Tilemap::ChunkIndex &chunkIndex) {
+void BuildLayerChunks(flecs::world &world, const tmx::Map &tilemap, const tmx::TileLayer &layer, int layerIndex, flecs::entity layerGroup, const std::shared_ptr<TilemapTextureBank> &textureBank, Tilemap::ChunkIndex &chunkIndex) {
   const auto mapTileCount = tilemap.getTileCount();
   const auto mapTileSize = tilemap.getTileSize();
   const auto &allTiles = layer.getTiles();
@@ -164,12 +168,12 @@ void BuildLayerChunks(flecs::world &world, const tmx::Map &tilemap, const tmx::T
           static_cast<float>(Tilemap::CHUNK_SIZE * tileHeight)};
 
       const float sortY = chunk.destRect.y + chunk.destRect.height + static_cast<float>(layerIndex) * 100000.0f;
-      CreateChunkEntity(world, std::move(chunk), sortY, false, textureBank, chunkIndex);
+      CreateChunkEntity(world, std::move(chunk), sortY, false, layerGroup, textureBank, chunkIndex);
     }
   }
 }
 
-void BuildObjectChunks(flecs::world &world, const tmx::Map &tilemap, const tmx::ObjectGroup &objectGroup, int layerIndex, const std::shared_ptr<TilemapTextureBank> &textureBank, Tilemap::ChunkIndex &chunkIndex) {
+void BuildObjectChunks(flecs::world &world, const tmx::Map &tilemap, const tmx::ObjectGroup &objectGroup, int layerIndex, flecs::entity layerGroup, const std::shared_ptr<TilemapTextureBank> &textureBank, Tilemap::ChunkIndex &chunkIndex) {
   const auto mapTileSize = tilemap.getTileSize();
   const float mapChunkWidth = static_cast<float>(Tilemap::CHUNK_SIZE * static_cast<int>(mapTileSize.x));
   const float mapChunkHeight = static_cast<float>(Tilemap::CHUNK_SIZE * static_cast<int>(mapTileSize.y));
@@ -212,7 +216,7 @@ void BuildObjectChunks(flecs::world &world, const tmx::Map &tilemap, const tmx::
     chunk.tiles.push_back(tile);
 
     const float sortY = posY + tileHeight + static_cast<float>(layerIndex) * 100000.0f;
-    CreateChunkEntity(world, std::move(chunk), sortY, true, textureBank, chunkIndex);
+    CreateChunkEntity(world, std::move(chunk), sortY, true, layerGroup, textureBank, chunkIndex);
   }
 }
 
