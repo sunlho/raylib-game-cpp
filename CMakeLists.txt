@@ -15,6 +15,7 @@ find_package(pfr REQUIRED)
 add_executable(${PROJECT_NAME}
     src/main.cpp
     src/modules/Camera.cpp
+    src/modules/Character.cpp
     src/modules/Movement.cpp
     src/modules/Rendering.cpp
     src/modules/Tilemap/Tilemap.cpp

@@ -75,12 +75,4 @@ void Rendering::Import(flecs::world &world) {
 
         renderable.object->Draw(p);
       });
-
-  world.system("Check Exit Request")
-      .kind(flecs::PostFrame)
-      .run([](flecs::iter &it) {
-        if (WindowShouldClose()) {
-          it.world().quit();
-        }
-      });
 }
