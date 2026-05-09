@@ -32,12 +32,12 @@ void GameCamera::Import(flecs::world &world) {
           return;
         }
 
-        auto mainWindow = world.singleton<Rendering::MainWindow>();
-        const auto &windowSize = mainWindow.get<Rendering::WindowSize>();
+        auto renderTargetSizeEntity = world.singleton<Rendering::RenderTargetSize>();
+        const auto &renderTargetSize = renderTargetSizeEntity.get<Rendering::RenderTargetSize>();
 
         cameraState.value.offset = Vector2{
-            windowSize.dimension.x * 0.5f,
-            windowSize.dimension.y * 0.5f};
+            renderTargetSize.dimension.x * 0.5f,
+            renderTargetSize.dimension.y * 0.5f};
       });
 
   world.system<const CameraState>("Begin Camera 2D")

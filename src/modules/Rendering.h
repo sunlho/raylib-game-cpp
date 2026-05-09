@@ -47,6 +47,14 @@ struct WindowSize {
   Vector2 dimension;
 };
 
+struct RenderTargetSize {
+  Vector2 dimension;
+};
+
+struct RenderTargetState {
+  bool active = false;
+};
+
 struct WindowTitle {
   std::string value;
 };

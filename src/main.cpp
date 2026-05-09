@@ -33,10 +33,22 @@ int main() {
       .set<Rendering::WindowTitle>({"raylib game cpp"})
       .set<Rendering::WindowFPS>({60});
 
+  world.component<Rendering::RenderTargetSize>()
+      .add(flecs::Singleton)
+      .set<Rendering::RenderTargetSize>({Vector2{SCREEN_WIDTH * 0.5f, SCREEN_HEIGHT * 0.5f}});
+
+  world.component<Rendering::RenderTargetState>()
+      .add(flecs::Singleton)
+      .set<Rendering::RenderTargetState>({});
+
+  world.component<RenderTexture2D>()
+      .add(flecs::Singleton)
+      .set<RenderTexture2D>({});
+
   world.component<GameCamera::MainCamera>()
       .add(flecs::Singleton)
       .set<GameCamera::CameraState>({
-          Camera2D{Vector2{0.0f, 0.0f}, Vector2{0.0f, 0.0f}, 0.0f, 2.0f},
+          Camera2D{Vector2{0.0f, 0.0f}, Vector2{0.0f, 0.0f}, 0.0f, 1.0f},
           true,
           true,
       });
