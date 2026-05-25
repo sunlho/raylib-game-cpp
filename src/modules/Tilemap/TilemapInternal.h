@@ -16,6 +16,7 @@
 namespace TilemapInternal {
 
 struct TilemapTilesetTexture {
+  const tmx::Tileset *origin;
   Texture2D texture = {0};
   std::uint32_t firstGid = 0;
   std::uint32_t lastGid = 0;

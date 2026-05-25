@@ -17,6 +17,10 @@ struct TilemapPath {
   std::string value;
 };
 
+struct MapBounds {
+  Vector2 dimension = {0.0f, 0.0f};
+};
+
 struct ChunkTile {
   std::uint32_t tileGid = 0;
   int textureIndex = -1;

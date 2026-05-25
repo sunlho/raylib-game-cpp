@@ -70,6 +70,7 @@ std::shared_ptr<TilemapTextureBank> LoadTilesetTextures(const tmx::Map &tilemap,
     }
 
     TilemapTilesetTexture loaded;
+    loaded.origin = &tileset;
     loaded.texture = LoadTexture(texturePath.string().c_str());
     loaded.firstGid = tileset.getFirstGID();
     loaded.lastGid = tileset.getFirstGID() + tileset.getTileCount() - 1;

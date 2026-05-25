@@ -11,11 +11,15 @@ void Tilemap::Import(flecs::world &world) {
   Reflection::Register<Chunk>(world);
   Reflection::Register<ChunkDrawable>(world);
   Reflection::Register<ChunkObject>(world);
+  Reflection::Register<TilemapPath>(world);
+  Reflection::Register<MapBounds>(world);
+
   world.component<ChunkIndex>()
       .add(flecs::Singleton);
   world.set<ChunkIndex>({});
-
-  Reflection::Register<TilemapPath>(world);
+  world.component<MapBounds>()
+      .add(flecs::Singleton);
+  world.set<MapBounds>({});
 
   world.system<const TilemapPath>("Load Tilemap")
       .kind(flecs::OnStart)
@@ -33,6 +37,14 @@ void Tilemap::Import(flecs::world &world) {
           TraceLog(LOG_WARNING, "Failed to load tilemap: %s", mapPath.string().c_str());
           return;
         }
+
+        const auto mapTileCount = tilemap.getTileCount();
+        const auto mapTileSize = tilemap.getTileSize();
+        auto &mapBounds = world.get_mut<MapBounds>();
+        mapBounds.dimension = Vector2{
+            static_cast<float>(mapTileCount.x) * static_cast<float>(mapTileSize.x),
+            static_cast<float>(mapTileCount.y) * static_cast<float>(mapTileSize.y)};
+        world.modified<MapBounds>();
 
         auto &chunkIndex = world.get_mut<ChunkIndex>();
 

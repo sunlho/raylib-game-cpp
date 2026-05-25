@@ -154,6 +154,9 @@ void BuildLayerChunks(flecs::world &world, const tmx::Map &tilemap, const tmx::T
               static_cast<float>(tileHeight)};
 
           chunk.tiles.push_back(chunkTile);
+
+          const auto tile = tileset.origin->getTile(gid);
+          const auto objects = tile->objectGroup.getObjects();
         }
       }
 

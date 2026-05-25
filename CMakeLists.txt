@@ -21,6 +21,7 @@ add_executable(${PROJECT_NAME}
     src/modules/Tilemap/Tilemap.cpp
     src/modules/Tilemap/TilemapChunks.cpp
     src/modules/Tilemap/TilemapTextures.cpp
+    src/modules/Tilemap/TilemapCollison.cpp
     src/modules/Reflection.h
 )
 target_include_directories(${PROJECT_NAME} PRIVATE src)
