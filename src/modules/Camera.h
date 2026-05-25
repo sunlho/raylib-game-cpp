@@ -19,6 +19,9 @@ struct CameraState {
       1.0f};
   bool enabled = true;
   bool autoCenterOffset = true;
+  Vector2 followOffset = {0.0f, 0.0f};
+  float followSpeed = 10.0f;
+  bool snapTargetToPixel = true;
 };
 
 void Import(flecs::world &world);

@@ -1,9 +1,17 @@
+#include <algorithm>
 #include <array>
 
 #include "Reflection.h"
 #include "Rendering.h"
 
 namespace {
+void DrawScaledRenderTarget(const RenderTexture2D &renderTarget, const Vector2 &targetSize) {
+  const Rectangle source = {0.0f, 0.0f, static_cast<float>(renderTarget.texture.width), -static_cast<float>(renderTarget.texture.height)};
+  const Rectangle destination = {0.0f, 0.0f, static_cast<float>(GetScreenWidth()), static_cast<float>(GetScreenHeight())};
+
+  DrawTexturePro(renderTarget.texture, source, destination, Vector2{0.0f, 0.0f}, 0.0f, WHITE);
+}
+
 bool EnsureRenderTarget(RenderTexture2D &renderTarget, const Vector2 &size) {
   const int width = static_cast<int>(size.x);
   const int height = static_cast<int>(size.y);
@@ -115,9 +123,9 @@ void Rendering::Import(flecs::world &world) {
           const auto &renderTarget = renderTargetEntity.get<RenderTexture2D>();
           EndTextureMode();
 
-          const Rectangle source = {0.0f, 0.0f, static_cast<float>(renderTarget.texture.width), -static_cast<float>(renderTarget.texture.height)};
-          const Rectangle destination = {0.0f, 0.0f, static_cast<float>(GetScreenWidth()), static_cast<float>(GetScreenHeight())};
-          DrawTexturePro(renderTarget.texture, source, destination, Vector2{0.0f, 0.0f}, 0.0f, WHITE);
+          auto renderTargetSizeEntity = it.world().singleton<RenderTargetSize>();
+          const auto &renderTargetSize = renderTargetSizeEntity.get<RenderTargetSize>();
+          DrawScaledRenderTarget(renderTarget, renderTargetSize.dimension);
         }
 
         DrawFPS(GetScreenWidth() - 100, 10);

@@ -472,7 +472,9 @@ void Import(flecs::world &world) {
             position.value.y,
             static_cast<float>(animation.width) * spriteSet.scale,
             static_cast<float>(animation.height) * spriteSet.scale};
-        Vector2 origin = spriteSet.useCenterOrigin ? Vector2{dest.width * 0.5f, dest.height * 0.5f} : spriteSet.origin;
+        dest.x = roundf(dest.x);
+        dest.y = roundf(dest.y);
+        Vector2 origin = spriteSet.useCenterOrigin ? Vector2{roundf(dest.width * 0.5f), roundf(dest.height * 0.5f)} : spriteSet.origin;
 
         DrawTexturePro(animation.texture, src, dest, origin, 0.0f, WHITE);
       });

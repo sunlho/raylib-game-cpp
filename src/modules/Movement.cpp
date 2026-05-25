@@ -54,11 +54,23 @@ void Movement::Import(flecs::world &world) {
         auto world = it.world();
         auto mainCamera = world.singleton<GameCamera::MainCamera>();
         auto &cameraState = mainCamera.get_mut<GameCamera::CameraState>();
-        Vector2 target = position.value;
 
-        target.x = roundf(target.x);
-        target.y = roundf(target.y);
+        Vector2 target = Vector2Add(position.value, cameraState.followOffset);
 
-        cameraState.value.target = target;
+        if (cameraState.snapTargetToPixel) {
+          target.x = roundf(target.x);
+          target.y = roundf(target.y);
+        }
+
+        const float deltaTime = it.delta_time();
+        const float followAmount = cameraState.followSpeed <= 0.0f ? 1.0f : cameraState.followSpeed * deltaTime;
+        const float lerpAmount = followAmount > 1.0f ? 1.0f : followAmount;
+
+        cameraState.value.target = Vector2Lerp(cameraState.value.target, target, lerpAmount);
+
+        if (cameraState.snapTargetToPixel) {
+          cameraState.value.target.x = roundf(cameraState.value.target.x);
+          cameraState.value.target.y = roundf(cameraState.value.target.y);
+        }
       });
 }

@@ -10,8 +10,10 @@
 #include "modules/Rendering.h"
 #include "modules/Tilemap/Tilemap.h"
 
-#define SCREEN_WIDTH 1280
-#define SCREEN_HEIGHT 720
+constexpr int SCREEN_WIDTH = 1280;
+constexpr int SCREEN_HEIGHT = 720;
+constexpr int BASE_WIDTH = 480;
+constexpr int BASE_HEIGHT = 270;
 
 int main() {
   flecs::world world;
@@ -35,7 +37,7 @@ int main() {
 
   world.component<Rendering::RenderTargetSize>()
       .add(flecs::Singleton)
-      .set<Rendering::RenderTargetSize>({Vector2{SCREEN_WIDTH * 0.5f, SCREEN_HEIGHT * 0.5f}});
+      .set<Rendering::RenderTargetSize>({Vector2{static_cast<float>(BASE_WIDTH), static_cast<float>(BASE_HEIGHT)}});
 
   world.component<Rendering::RenderTargetState>()
       .add(flecs::Singleton)
@@ -84,7 +86,7 @@ int main() {
       .set<Character::SpriteSet>(playerSprites)
       .set<Rendering::Position>({Vector2{128.0f, 128.0f}})
       .set<Movement::Velocity>({Vector2{0.0f, 0.0f}})
-      .set<Movement::MoveSpeed>({120.0f});
+      .set<Movement::MoveSpeed>({85.0f});
 
   while (world.progress(GetFrameTime())) {
     if (WindowShouldClose()) {
