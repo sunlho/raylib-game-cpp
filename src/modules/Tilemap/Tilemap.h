@@ -73,6 +73,11 @@ struct ChunkIndex {
   std::vector<flecs::entity_t> allChunkEntities;
 };
 
+struct TilemapState {
+  flecs::entity mapRoot = {};
+};
+
 void Import(flecs::world &world);
+void SetTilemapPath(flecs::world &world, const std::string &path);
 
 } // namespace Tilemap

@@ -6,6 +6,7 @@
 #include "modules/Camera.h"
 #include "modules/Character.h"
 #include "modules/Movement.h"
+#include "modules/PhysicsDebugDraw.h"
 #include "modules/Reflection.h"
 #include "modules/Rendering.h"
 #include "modules/Tilemap/Tilemap.h"
@@ -28,6 +29,7 @@ int main() {
   Character::Import(world);
   GameCamera::Import(world);
   Tilemap::Import(world);
+  PhysicsDebugDraw::Import(world);
 
   world.component<Rendering::MainWindow>()
       .add(flecs::Singleton)
@@ -55,8 +57,7 @@ int main() {
           true,
       });
 
-  world.entity("tilemap")
-      .set<Tilemap::TilemapPath>({"Map.tmx"});
+  Tilemap::SetTilemapPath(world, "Map.tmx");
 
   Character::SpriteSet playerSprites;
   playerSprites.entries = {

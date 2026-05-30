@@ -8,4 +8,9 @@
    </object>
   </objectgroup>
  </tile>
+ <tile id="10">
+  <objectgroup draworder="index" id="2">
+   <object id="1" x="0" y="12" width="34" height="3"/>
+  </objectgroup>
+ </tile>
 </tileset>

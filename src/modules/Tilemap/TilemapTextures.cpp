@@ -70,7 +70,6 @@ std::shared_ptr<TilemapTextureBank> LoadTilesetTextures(const tmx::Map &tilemap,
     }
 
     TilemapTilesetTexture loaded;
-    loaded.origin = &tileset;
     loaded.texture = LoadTexture(texturePath.string().c_str());
     loaded.firstGid = tileset.getFirstGID();
     loaded.lastGid = tileset.getFirstGID() + tileset.getTileCount() - 1;
@@ -79,6 +78,36 @@ std::shared_ptr<TilemapTextureBank> LoadTilesetTextures(const tmx::Map &tilemap,
     loaded.columnCount = static_cast<int>(tileset.getColumnCount());
     loaded.spacing = static_cast<int>(tileset.getSpacing());
     loaded.margin = static_cast<int>(tileset.getMargin());
+    loaded.tiles.reserve(tileset.getTileCount());
+
+    const auto tiles = tileset.getTiles();
+    for (const auto &tile : tiles) {
+      const std::uint32_t tileId = tile.ID + tileset.getFirstGID();
+      TilemapTileObject tileObject;
+
+      const auto &objectGroup = tile.objectGroup;
+      const auto &objects = objectGroup.getObjects();
+      tileObject.collisions.reserve(objects.size());
+
+      for (const auto &object : objects) {
+        TileCollision collision;
+        collision.shape = static_cast<TileCollisionShape>(object.getShape());
+        auto const aabb = object.getAABB();
+        collision.AABB = Rectangle{aabb.left, aabb.top, aabb.width, aabb.height};
+        collision.position = Vector2{object.getPosition().x, object.getPosition().y};
+        collision.rotation = object.getRotation();
+
+        const auto &points = object.getPoints();
+        collision.points.reserve(points.size());
+        for (const auto &point : points) {
+          collision.points.emplace_back(point.x, point.y);
+        }
+
+        tileObject.collisions.push_back(std::move(collision));
+      }
+
+      loaded.tiles[tileId] = std::move(tileObject);
+    }
 
     textureBank->tilesets.push_back(loaded);
   }

@@ -18,11 +18,11 @@ add_executable(${PROJECT_NAME}
     src/modules/Character.cpp
     src/modules/Movement.cpp
     src/modules/Rendering.cpp
+    src/modules/PhysicsDebugDraw.cpp
     src/modules/Tilemap/Tilemap.cpp
     src/modules/Tilemap/TilemapChunks.cpp
     src/modules/Tilemap/TilemapTextures.cpp
-    src/modules/Tilemap/TilemapCollison.cpp
-    src/modules/Reflection.h
+    src/modules/Tilemap/TilemapCollision.cpp
 )
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 

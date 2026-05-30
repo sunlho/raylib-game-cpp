@@ -155,8 +155,10 @@ void BuildLayerChunks(flecs::world &world, const tmx::Map &tilemap, const tmx::T
 
           chunk.tiles.push_back(chunkTile);
 
-          const auto tile = tileset.origin->getTile(gid);
-          const auto objects = tile->objectGroup.getObjects();
+          const auto tileObject = tileset.getTile(gid);
+          if (tileObject && !tileObject->collisions.empty()) {
+            CreateCollisionEntity(world, tileObject->collisions, chunkTile.destRect, layerIndex, layerGroup);
+          }
         }
       }
 
