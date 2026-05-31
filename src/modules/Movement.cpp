@@ -115,19 +115,23 @@ void Movement::Import(flecs::world &world) {
         const auto &mapBounds = mapBoundsEntity.get<Tilemap::MapBounds>();
         auto renderTargetSizeEntity = world.singleton<Rendering::RenderTargetSize>();
         const auto &renderTargetSize = renderTargetSizeEntity.get<Rendering::RenderTargetSize>();
+        const bool snapTargetToPixel = cameraState.snapTargetToPixel;
 
         Vector2 target = Vector2Add(position.value, cameraState.followOffset);
 
-        if (cameraState.snapTargetToPixel) {
+        if (snapTargetToPixel) {
           target.x = roundf(target.x);
           target.y = roundf(target.y);
         }
 
-        const float deltaTime = it.delta_time();
-        const float followAmount = cameraState.followSpeed <= 0.0f ? 1.0f : 1.0f - expf(-cameraState.followSpeed * deltaTime);
-        const float lerpAmount = followAmount > 1.0f ? 1.0f : followAmount;
-
-        cameraState.value.target = Vector2Lerp(cameraState.value.target, target, lerpAmount);
+        if (snapTargetToPixel || cameraState.followSpeed <= 0.0f) {
+          cameraState.value.target = target;
+        } else {
+          const float deltaTime = it.delta_time();
+          const float followAmount = 1.0f - expf(-cameraState.followSpeed * deltaTime);
+          const float lerpAmount = followAmount > 1.0f ? 1.0f : followAmount;
+          cameraState.value.target = Vector2Lerp(cameraState.value.target, target, lerpAmount);
+        }
 
         const Vector2 viewportHalf = Vector2{
             renderTargetSize.dimension.x * 0.5f,
@@ -136,7 +140,7 @@ void Movement::Import(flecs::world &world) {
         cameraState.value.target.x = ClampAxisToBounds(cameraState.value.target.x, viewportHalf.x, mapBounds.dimension.x);
         cameraState.value.target.y = ClampAxisToBounds(cameraState.value.target.y, viewportHalf.y, mapBounds.dimension.y);
 
-        if (cameraState.snapTargetToPixel) {
+        if (snapTargetToPixel) {
           cameraState.value.target.x = roundf(cameraState.value.target.x);
           cameraState.value.target.y = roundf(cameraState.value.target.y);
         }

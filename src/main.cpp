@@ -11,10 +11,16 @@
 #include "modules/Rendering.h"
 #include "modules/Tilemap/Tilemap.h"
 
-constexpr int SCREEN_WIDTH = 1280;
-constexpr int SCREEN_HEIGHT = 720;
-constexpr int BASE_WIDTH = 480;
-constexpr int BASE_HEIGHT = 270;
+// constexpr int SCREEN_WIDTH = 2560;
+// constexpr int SCREEN_HEIGHT = 1440;
+// constexpr int SCREEN_WIDTH = 1920;
+// constexpr int SCREEN_HEIGHT = 1080;
+constexpr int SCREEN_WIDTH = 1600;
+constexpr int SCREEN_HEIGHT = 900;
+// constexpr int SCREEN_WIDTH = 1280;
+// constexpr int SCREEN_HEIGHT = 720;
+constexpr int BASE_WIDTH = 640;
+constexpr int BASE_HEIGHT = 360;
 
 int main() {
   flecs::world world;

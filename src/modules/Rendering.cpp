@@ -6,8 +6,29 @@
 
 namespace {
 void DrawScaledRenderTarget(const RenderTexture2D &renderTarget, const Vector2 &targetSize) {
+  const int screenWidth = GetScreenWidth();
+  const int screenHeight = GetScreenHeight();
+  const int targetWidth = static_cast<int>(targetSize.x);
+  const int targetHeight = static_cast<int>(targetSize.y);
+
+  if (screenWidth <= 0 || screenHeight <= 0 || targetWidth <= 0 || targetHeight <= 0) {
+    return;
+  }
+
+  const int scaleX = (screenWidth + targetWidth - 1) / targetWidth;
+  const int scaleY = (screenHeight + targetHeight - 1) / targetHeight;
+  const int scale = std::max(1, std::max(scaleX, scaleY));
+  const int destinationWidth = targetWidth * scale;
+  const int destinationHeight = targetHeight * scale;
+  const int offsetX = (screenWidth - destinationWidth) / 2;
+  const int offsetY = (screenHeight - destinationHeight) / 2;
+
   const Rectangle source = {0.0f, 0.0f, static_cast<float>(renderTarget.texture.width), -static_cast<float>(renderTarget.texture.height)};
-  const Rectangle destination = {0.0f, 0.0f, static_cast<float>(GetScreenWidth()), static_cast<float>(GetScreenHeight())};
+  const Rectangle destination = {
+      static_cast<float>(offsetX),
+      static_cast<float>(offsetY),
+      static_cast<float>(destinationWidth),
+      static_cast<float>(destinationHeight)};
 
   DrawTexturePro(renderTarget.texture, source, destination, Vector2{0.0f, 0.0f}, 0.0f, WHITE);
 }
