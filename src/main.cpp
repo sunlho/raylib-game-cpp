@@ -5,8 +5,8 @@
 
 #include "modules/Camera.h"
 #include "modules/Character.h"
+#include "modules/Debug/PhysicsDebugDraw.h"
 #include "modules/Movement.h"
-#include "modules/PhysicsDebugDraw.h"
 #include "modules/Reflection.h"
 #include "modules/Rendering.h"
 #include "modules/Tilemap/Tilemap.h"

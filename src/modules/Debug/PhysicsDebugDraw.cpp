@@ -158,7 +158,7 @@ b2DebugDraw CreateDebugDraw() {
   draw.DrawSolidCapsuleFcn = DrawDebugSolidCapsule;
   draw.DrawSegmentFcn = DrawLineSegment;
   draw.DrawTransformFcn = DrawDebugTransform;
-  draw.DrawPointFcn = DrawDebugPoint;
+  // draw.DrawPointFcn = DrawDebugPoint;
   draw.DrawStringFcn = DrawDebugString;
   draw.drawShapes = true;
   draw.drawJoints = true;

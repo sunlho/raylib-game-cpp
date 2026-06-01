@@ -405,3 +405,4 @@ build/
 
 CMakeUserPresets.json
 
+!src/modules/Debug/

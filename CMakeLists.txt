@@ -16,13 +16,17 @@ add_executable(${PROJECT_NAME}
     src/main.cpp
     src/modules/Camera.cpp
     src/modules/Character.cpp
+    src/modules/MapManager.cpp
     src/modules/Movement.cpp
     src/modules/Rendering.cpp
-    src/modules/PhysicsDebugDraw.cpp
+    src/modules/Physics.cpp
+
     src/modules/Tilemap/Tilemap.cpp
     src/modules/Tilemap/TilemapChunks.cpp
     src/modules/Tilemap/TilemapTextures.cpp
     src/modules/Tilemap/TilemapCollision.cpp
+
+    src/modules/Debug/PhysicsDebugDraw.cpp
 )
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 
