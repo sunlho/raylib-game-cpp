@@ -12,6 +12,7 @@ struct MapPath {
 
 struct MapState {
   flecs::entity mapRoot = {};
+  std::string currentPath;
 };
 
 void Import(flecs::world &world);

@@ -1,6 +1,7 @@
 #include "MapManage.h"
 
 #include <cstddef>
+#include <list>
 #include <memory>
 #include <unordered_map>
 #include <utility>
@@ -55,6 +56,17 @@ struct LoadedMapState {
   std::shared_ptr<TilemapInternal::TilemapTextureBank> textureBank;
 };
 
+struct CachedMapEntry {
+  Tilemap::LoadedMap loadedMap;
+  std::list<std::string>::iterator lruIt;
+};
+
+struct MapCacheState {
+  std::unordered_map<std::string, CachedMapEntry> cache;
+  std::list<std::string> usageOrder;
+  std::size_t maxSize = 3;
+};
+
 void DestroyCurrentMap(MapManage::MapState &mapState) {
   if (mapState.mapRoot.is_valid()) {
     mapState.mapRoot.destruct();
@@ -69,6 +81,52 @@ void ClearMapData(flecs::world &world) {
 
   auto &loadedState = world.get_mut<LoadedMapState>();
   loadedState.textureBank.reset();
+}
+
+void TouchCacheEntry(MapCacheState &cacheState, std::unordered_map<std::string, CachedMapEntry>::iterator it) {
+  cacheState.usageOrder.erase(it->second.lruIt);
+  cacheState.usageOrder.push_front(it->first);
+  it->second.lruIt = cacheState.usageOrder.begin();
+}
+
+Tilemap::LoadedMap *GetMapFromCache(MapCacheState &cacheState, const std::string &path) {
+  auto it = cacheState.cache.find(path);
+  if (it == cacheState.cache.end()) {
+    return nullptr;
+  }
+
+  TouchCacheEntry(cacheState, it);
+  return &it->second.loadedMap;
+}
+
+Tilemap::LoadedMap *LoadMapIntoCache(MapCacheState &cacheState, const std::string &path) {
+  Tilemap::LoadedMap loadedMap;
+  if (!Tilemap::LoadFromPath(path, loadedMap)) {
+    return nullptr;
+  }
+
+  cacheState.usageOrder.push_front(path);
+  auto insertIt = cacheState.cache.emplace(std::piecewise_construct, std::forward_as_tuple(path), std::forward_as_tuple())
+                      .first;
+  insertIt->second.loadedMap = std::move(loadedMap);
+  insertIt->second.lruIt = cacheState.usageOrder.begin();
+
+  if (cacheState.cache.size() > cacheState.maxSize) {
+    const std::string evictPath = cacheState.usageOrder.back();
+    cacheState.cache.erase(evictPath);
+    cacheState.usageOrder.pop_back();
+  }
+
+  return &insertIt->second.loadedMap;
+}
+
+Tilemap::LoadedMap *GetOrLoadMap(MapCacheState &cacheState, const std::string &path) {
+  auto *cachedMap = GetMapFromCache(cacheState, path);
+  if (cachedMap) {
+    return cachedMap;
+  }
+
+  return LoadMapIntoCache(cacheState, path);
 }
 
 void CreateChunkEntity(flecs::world &world, const Tilemap::Chunk &chunk, const std::shared_ptr<TilemapInternal::TilemapTextureBank> &textureBank, flecs::entity layerGroup) {
@@ -99,27 +157,33 @@ void CreateChunkEntity(flecs::world &world, const Tilemap::Chunk &chunk, const s
 }
 
 void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
-  Tilemap::LoadedMap loadedMap;
-  if (!Tilemap::LoadFromPath(mapPath.value, loadedMap)) {
+  auto &mapState = world.get_mut<MapManage::MapState>();
+  if (mapState.currentPath == mapPath.value && mapState.mapRoot.is_valid()) {
     return;
   }
 
-  auto &mapState = world.get_mut<MapManage::MapState>();
+  auto &cacheState = world.get_mut<MapCacheState>();
+  auto *loadedMap = GetOrLoadMap(cacheState, mapPath.value);
+  if (!loadedMap) {
+    return;
+  }
+
   DestroyCurrentMap(mapState);
   ClearMapData(world);
 
   mapState.mapRoot = world.entity("map_root");
+  mapState.currentPath = mapPath.value;
 
   auto &mapBounds = world.get_mut<Tilemap::MapBounds>();
-  mapBounds = loadedMap.bounds;
+  mapBounds = loadedMap->bounds;
   world.modified<Tilemap::MapBounds>();
 
   auto &loadedState = world.get_mut<LoadedMapState>();
-  loadedState.textureBank = loadedMap.textureBank;
+  loadedState.textureBank = loadedMap->textureBank;
 
   std::unordered_map<int, flecs::entity> layerGroups;
 
-  for (const auto &chunk : loadedMap.chunks) {
+  for (const auto &chunk : loadedMap->chunks) {
     auto [groupIt, inserted] = layerGroups.try_emplace(chunk.layerIndex);
     if (inserted) {
       const std::string layerName = "MapLayer_" + std::to_string(chunk.layerIndex);
@@ -152,6 +216,10 @@ void MapManage::Import(flecs::world &world) {
   world.component<LoadedMapState>()
       .add(flecs::Singleton);
   world.set<LoadedMapState>({});
+
+  world.component<MapCacheState>()
+      .add(flecs::Singleton);
+  world.set<MapCacheState>({});
 
   world.system<const MapPath>("Load Map")
       .kind(flecs::OnStart)
