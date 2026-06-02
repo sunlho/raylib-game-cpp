@@ -7,7 +7,6 @@ set(CMAKE_CXX_STANDARD 20)
 
 find_package(raylib REQUIRED)
 find_package(flecs REQUIRED)
-find_package(box2d REQUIRED)
 find_package(tmxlite REQUIRED)
 find_package(WebP REQUIRED)
 find_package(pfr REQUIRED)
@@ -16,21 +15,17 @@ add_executable(${PROJECT_NAME}
     src/main.cpp
     src/modules/Camera.cpp
     src/modules/Character.cpp
-    src/modules/MapManager.cpp
+    src/modules/MapManage.cpp
     src/modules/Movement.cpp
     src/modules/Rendering.cpp
-    src/modules/Physics.cpp
 
     src/modules/Tilemap/Tilemap.cpp
     src/modules/Tilemap/TilemapChunks.cpp
     src/modules/Tilemap/TilemapTextures.cpp
-    src/modules/Tilemap/TilemapCollision.cpp
-
-    src/modules/Debug/PhysicsDebugDraw.cpp
 )
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE raylib flecs::flecs_static box2d::box2d tmxlite::tmxlite libwebp::libwebp pfr::pfr)
+target_link_libraries(${PROJECT_NAME} PRIVATE raylib flecs::flecs_static tmxlite::tmxlite libwebp::libwebp pfr::pfr)
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(ASSETS_PATH "${CMAKE_SOURCE_DIR}/assets")

@@ -117,12 +117,9 @@ void Rendering::Import(flecs::world &world) {
   world.system("BeginDrawing")
       .kind<Phases::PreDraw>()
       .run([](flecs::iter &it) {
-        auto renderTargetEntity = it.world().singleton<RenderTexture2D>();
-        auto &renderTarget = renderTargetEntity.get_mut<RenderTexture2D>();
-        auto renderTargetSizeEntity = it.world().singleton<RenderTargetSize>();
-        const auto &renderTargetSize = renderTargetSizeEntity.get<RenderTargetSize>();
-        auto renderTargetStateEntity = it.world().singleton<RenderTargetState>();
-        auto &renderTargetState = renderTargetStateEntity.get_mut<RenderTargetState>();
+        auto &renderTarget = it.world().get_mut<RenderTexture2D>();
+        const auto &renderTargetSize = it.world().get<RenderTargetSize>();
+        auto &renderTargetState = it.world().get_mut<RenderTargetState>();
 
         BeginDrawing();
 
@@ -136,16 +133,13 @@ void Rendering::Import(flecs::world &world) {
   world.system("EndDraw")
       .kind<Phases::PostDraw>()
       .run([](flecs::iter &it) {
-        auto renderTargetStateEntity = it.world().singleton<RenderTargetState>();
-        const auto &renderTargetState = renderTargetStateEntity.get<RenderTargetState>();
+        const auto &renderTargetState = it.world().get<RenderTargetState>();
 
         if (renderTargetState.active) {
-          auto renderTargetEntity = it.world().singleton<RenderTexture2D>();
-          const auto &renderTarget = renderTargetEntity.get<RenderTexture2D>();
+          const auto &renderTarget = it.world().get<RenderTexture2D>();
           EndTextureMode();
 
-          auto renderTargetSizeEntity = it.world().singleton<RenderTargetSize>();
-          const auto &renderTargetSize = renderTargetSizeEntity.get<RenderTargetSize>();
+          const auto &renderTargetSize = it.world().get<RenderTargetSize>();
           DrawScaledRenderTarget(renderTarget, renderTargetSize.dimension);
         }
 

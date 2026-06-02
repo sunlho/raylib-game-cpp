@@ -1,21 +1,20 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
-#include "flecs.h"
 #include "raylib.h"
 
 #include "modules/Rendering.h"
 
+namespace TilemapInternal {
+struct TilemapTextureBank;
+}
+
 namespace Tilemap {
 static constexpr int CHUNK_SIZE = 16;
-
-struct TilemapPath {
-  std::string value;
-};
 
 struct MapBounds {
   Vector2 dimension = {0.0f, 0.0f};
@@ -55,29 +54,12 @@ struct Chunk {
   bool initialized = false;
 };
 
-struct ChunkDrawable {
-  Rendering::Position position = {{0.0f, 0.0f}};
-  Rendering::RenderComponent render = {};
-  float sortY = 0.0f;
-  float layerIndex = 0.0f;
+struct LoadedMap {
+  MapBounds bounds = {};
+  std::shared_ptr<TilemapInternal::TilemapTextureBank> textureBank;
+  std::vector<Chunk> chunks;
 };
 
-struct ChunkObject {
-  flecs::entity_t entity = 0;
-  Rectangle destRect = {0};
-};
-
-struct ChunkIndex {
-  std::unordered_map<std::uint64_t, std::vector<flecs::entity_t>> chunkEntityMap;
-  std::vector<ChunkObject> objects;
-  std::vector<flecs::entity_t> allChunkEntities;
-};
-
-struct TilemapState {
-  flecs::entity mapRoot = {};
-};
-
-void Import(flecs::world &world);
-void SetTilemapPath(flecs::world &world, const std::string &path);
+bool LoadFromPath(const std::string &path, LoadedMap &loadedMap);
 
 } // namespace Tilemap

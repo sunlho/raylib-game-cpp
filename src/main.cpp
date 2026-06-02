@@ -5,20 +5,19 @@
 
 #include "modules/Camera.h"
 #include "modules/Character.h"
-#include "modules/Debug/PhysicsDebugDraw.h"
+#include "modules/MapManage.h"
 #include "modules/Movement.h"
 #include "modules/Reflection.h"
 #include "modules/Rendering.h"
-#include "modules/Tilemap/Tilemap.h"
 
 // constexpr int SCREEN_WIDTH = 2560;
 // constexpr int SCREEN_HEIGHT = 1440;
 // constexpr int SCREEN_WIDTH = 1920;
 // constexpr int SCREEN_HEIGHT = 1080;
-constexpr int SCREEN_WIDTH = 1600;
-constexpr int SCREEN_HEIGHT = 900;
-// constexpr int SCREEN_WIDTH = 1280;
-// constexpr int SCREEN_HEIGHT = 720;
+// constexpr int SCREEN_WIDTH = 1600;
+// constexpr int SCREEN_HEIGHT = 900;
+constexpr int SCREEN_WIDTH = 1280;
+constexpr int SCREEN_HEIGHT = 720;
 constexpr int BASE_WIDTH = 640;
 constexpr int BASE_HEIGHT = 360;
 
@@ -34,8 +33,7 @@ int main() {
   Movement::Import(world);
   Character::Import(world);
   GameCamera::Import(world);
-  Tilemap::Import(world);
-  PhysicsDebugDraw::Import(world);
+  MapManage::Import(world);
 
   world.component<Rendering::MainWindow>()
       .add(flecs::Singleton)
@@ -63,7 +61,7 @@ int main() {
           true,
       });
 
-  Tilemap::SetTilemapPath(world, "Map.tmx");
+  MapManage::SetMapPath(world, "Map.tmx");
 
   Character::SpriteSet playerSprites;
   playerSprites.entries = {
@@ -91,7 +89,7 @@ int main() {
       .set<Character::AnimationController>({})
       .set<Character::IdleBehavior>({})
       .set<Character::SpriteSet>(playerSprites)
-      .set<Rendering::Position>({Vector2{128.0f, 128.0f}})
+      .set<Rendering::Position>({Vector2{500.0f, 500.0f}})
       .set<Movement::Velocity>({Vector2{0.0f, 0.0f}})
       .set<Movement::MoveSpeed>({85.0f});
 

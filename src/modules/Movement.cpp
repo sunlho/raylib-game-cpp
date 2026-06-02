@@ -96,8 +96,7 @@ void Movement::Import(flecs::world &world) {
       .kind<Movement::Phases::BoundsClamp>()
       .with<PlayerControlled>()
       .each([](flecs::iter &it, size_t, Rendering::Position &position, const Character::SpriteSet &spriteSet, const Character::AnimationController &controller) {
-        auto mapBoundsEntity = it.world().singleton<Tilemap::MapBounds>();
-        const auto &mapBounds = mapBoundsEntity.get<Tilemap::MapBounds>();
+        const auto &mapBounds = it.world().get<Tilemap::MapBounds>();
         const Vector2 halfExtents = GetSpriteHalfExtents(spriteSet, controller);
 
         position.value.x = ClampAxisToBounds(position.value.x, halfExtents.x, mapBounds.dimension.x);
