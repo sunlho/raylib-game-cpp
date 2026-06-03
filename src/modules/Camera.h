@@ -20,7 +20,7 @@ struct CameraState {
   bool enabled = true;
   bool autoCenterOffset = true;
   Vector2 followOffset = {0.0f, 0.0f};
-  float followSpeed = 10.0f;
+  float followSpeed = 6.0f;
   bool snapTargetToPixel = true;
 };
 

@@ -123,14 +123,10 @@ void Movement::Import(flecs::world &world) {
           target.y = roundf(target.y);
         }
 
-        if (snapTargetToPixel || cameraState.followSpeed <= 0.0f) {
-          cameraState.value.target = target;
-        } else {
-          const float deltaTime = it.delta_time();
-          const float followAmount = 1.0f - expf(-cameraState.followSpeed * deltaTime);
-          const float lerpAmount = followAmount > 1.0f ? 1.0f : followAmount;
-          cameraState.value.target = Vector2Lerp(cameraState.value.target, target, lerpAmount);
-        }
+        const float deltaTime = it.delta_time();
+        const float followAmount = 1.0f - expf(-cameraState.followSpeed * deltaTime);
+        const float lerpAmount = followAmount > 1.0f ? 1.0f : followAmount;
+        cameraState.value.target = Vector2Lerp(cameraState.value.target, target, lerpAmount);
 
         const Vector2 viewportHalf = Vector2{
             renderTargetSize.dimension.x * 0.5f,
