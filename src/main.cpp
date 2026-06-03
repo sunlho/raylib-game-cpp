@@ -1,12 +1,15 @@
+#include <iostream>
 #include <memory>
 
+#include "box2d/box2d.h"
 #include "flecs.h"
 #include "raylib.h"
 
 #include "modules/Camera.h"
-#include "modules/Character.h"
+#include "modules/Character/Character.h"
 #include "modules/MapManage.h"
 #include "modules/Movement.h"
+#include "modules/Physics.h"
 #include "modules/Reflection.h"
 #include "modules/Rendering.h"
 
@@ -34,6 +37,9 @@ int main() {
   Character::Import(world);
   GameCamera::Import(world);
   MapManage::Import(world);
+  Physics::Import(world);
+
+  Physics::CreateBox2DWorld(world);
 
   world.component<Rendering::MainWindow>()
       .add(flecs::Singleton)

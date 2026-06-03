@@ -10,14 +10,20 @@ find_package(flecs REQUIRED)
 find_package(tmxlite REQUIRED)
 find_package(WebP REQUIRED)
 find_package(pfr REQUIRED)
+find_package(box2d REQUIRED)
 
 add_executable(${PROJECT_NAME}
     src/main.cpp
     src/modules/Camera.cpp
-    src/modules/Character.cpp
     src/modules/MapManage.cpp
     src/modules/Movement.cpp
     src/modules/Rendering.cpp
+    src/modules/Physics.cpp
+
+    src/modules/Character/Character.cpp
+    src/modules/Character/CharacterAnimation.cpp
+    src/modules/Character/CharacterCore.cpp
+    src/modules/Character/CharacterSprites.cpp
 
     src/modules/Tilemap/Tilemap.cpp
     src/modules/Tilemap/TilemapChunks.cpp
@@ -25,7 +31,7 @@ add_executable(${PROJECT_NAME}
 )
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE raylib flecs::flecs_static tmxlite::tmxlite libwebp::libwebp pfr::pfr)
+target_link_libraries(${PROJECT_NAME} PRIVATE raylib flecs::flecs_static box2d::box2d tmxlite::tmxlite libwebp::libwebp pfr::pfr)
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(ASSETS_PATH "${CMAKE_SOURCE_DIR}/assets")

@@ -3,10 +3,10 @@
 #include <algorithm>
 
 #include "Camera.h"
-#include "Character.h"
 #include "Reflection.h"
 #include "Rendering.h"
 #include "Tilemap/Tilemap.h"
+#include "modules/Character/Character.h"
 #include "raymath.h"
 
 namespace {
