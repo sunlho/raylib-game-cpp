@@ -1,12 +1,14 @@
-#include "Movement.h"
 
 #include <algorithm>
+#include <iostream>
 
 #include "Camera.h"
+#include "Character/Character.h"
+#include "Movement.h"
 #include "Reflection.h"
 #include "Rendering.h"
+#include "Simulation.h"
 #include "Tilemap/Tilemap.h"
-#include "modules/Character/Character.h"
 #include "raymath.h"
 
 namespace {
@@ -50,25 +52,6 @@ void Movement::Import(flecs::world &world) {
   Reflection::Register<Velocity>(world);
   Reflection::Register<MoveSpeed>(world);
 
-  auto updatePhase = world.entity<Movement::Phases::Update>();
-  auto boundsClampPhase = world.entity<Movement::Phases::BoundsClamp>();
-  auto followPhase = world.entity<Movement::Phases::CameraFollow>();
-
-  updatePhase
-      .add(flecs::Phase)
-      .depends_on(world.entity<Rendering::Phases::PreDraw>());
-
-  boundsClampPhase
-      .add(flecs::Phase)
-      .depends_on(updatePhase);
-
-  followPhase
-      .add(flecs::Phase)
-      .depends_on(boundsClampPhase);
-
-  world.entity<Rendering::Phases::Background>()
-      .depends_on(followPhase);
-
   world.system<Velocity, const MoveSpeed>("Update Player Input")
       .kind<Movement::Phases::Update>()
       .with<PlayerControlled>()
@@ -87,13 +70,14 @@ void Movement::Import(flecs::world &world) {
       });
 
   world.system<Rendering::Position, const Velocity>("Move Entities")
-      .kind<Movement::Phases::Update>()
+      .kind<Simulation::FixedUpdate>()
       .each([](flecs::iter &it, size_t i, Rendering::Position &position, const Velocity &velocity) {
-        position.value = Vector2Add(position.value, Vector2Scale(velocity.value, it.delta_time()));
+        const float deltaTime = it.delta_time();
+        position.value = Vector2Add(position.value, Vector2Scale(velocity.value, deltaTime));
       });
 
   world.system<Rendering::Position, const Character::SpriteSet, const Character::AnimationController>("Clamp Player To Map Bounds")
-      .kind<Movement::Phases::BoundsClamp>()
+      .kind<Simulation::FixedUpdate>()
       .with<PlayerControlled>()
       .each([](flecs::iter &it, size_t, Rendering::Position &position, const Character::SpriteSet &spriteSet, const Character::AnimationController &controller) {
         const auto &mapBounds = it.world().get<Tilemap::MapBounds>();

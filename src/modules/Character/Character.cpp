@@ -17,14 +17,6 @@ void Import(flecs::world &world) {
   Reflection::Register<AnimationController>(world);
   Reflection::Register<IdleBehavior>(world);
 
-  auto updatePhase = world.entity<Character::Phases::Update>();
-  updatePhase
-      .add(flecs::Phase)
-      .depends_on(world.entity<Movement::Phases::Update>());
-
-  world.entity<Movement::Phases::CameraFollow>()
-      .depends_on(updatePhase);
-
   RegisterCharacterAnimation(world);
   RegisterCharacterSprites(world);
 }

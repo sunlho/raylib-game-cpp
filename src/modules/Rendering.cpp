@@ -1,8 +1,11 @@
 #include <algorithm>
 #include <array>
+#include <iostream>
 
+#include "Camera.h"
 #include "Reflection.h"
 #include "Rendering.h"
+#include "Simulation.h"
 
 namespace {
 void DrawScaledRenderTarget(const RenderTexture2D &renderTarget, const Vector2 &targetSize) {
@@ -66,25 +69,11 @@ void Rendering::Import(flecs::world &world) {
 
   Reflection::Register<Position>(world);
   Reflection::Register<RenderComponent>(world);
-
   Reflection::Register<WindowTitle>(world);
   Reflection::Register<WindowSize>(world);
   Reflection::Register<RenderTargetSize>(world);
   Reflection::Register<RenderTargetState>(world);
   Reflection::Register<WindowFPS>(world);
-
-  std::array Phases = {
-      world.entity<Phases::PreDraw>(),
-      world.entity<Phases::Background>(),
-      world.entity<Phases::Draw>(),
-      world.entity<Phases::PostDraw>()};
-
-  flecs::entity_t PriorPhase = flecs::OnStore;
-
-  for (auto &Phase : Phases) {
-    Phase.add(flecs::Phase).depends_on(PriorPhase);
-    PriorPhase = Phase;
-  }
 
   world.observer<const WindowTitle>("Update Window Title")
       .event(flecs::OnSet)
@@ -130,22 +119,6 @@ void Rendering::Import(flecs::world &world) {
 
         ClearBackground(BLACK);
       });
-  world.system("EndDraw")
-      .kind<Phases::PostDraw>()
-      .run([](flecs::iter &it) {
-        const auto &renderTargetState = it.world().get<RenderTargetState>();
-
-        if (renderTargetState.active) {
-          const auto &renderTarget = it.world().get<RenderTexture2D>();
-          EndTextureMode();
-
-          const auto &renderTargetSize = it.world().get<RenderTargetSize>();
-          DrawScaledRenderTarget(renderTarget, renderTargetSize.dimension);
-        }
-
-        DrawFPS(GetScreenWidth() - 100, 10);
-        EndDrawing();
-      });
 
   world.system<const Position, const RenderComponent>("Draw Renderables")
       .kind<Phases::Draw>()
@@ -155,5 +128,21 @@ void Rendering::Import(flecs::world &world) {
         }
 
         renderable.object->Draw(p);
+      });
+
+  world.system("EndDraw")
+      .kind<Phases::PostDraw>()
+      .run([](flecs::iter &it) {
+        const auto &renderTargetState = it.world().get<RenderTargetState>();
+
+        if (renderTargetState.active) {
+          EndTextureMode();
+          const auto &renderTarget = it.world().get<RenderTexture2D>();
+          const auto &renderTargetSize = it.world().get<RenderTargetSize>();
+          DrawScaledRenderTarget(renderTarget, renderTargetSize.dimension);
+        }
+
+        DrawFPS(GetScreenWidth() - 100, 10);
+        EndDrawing();
       });
 }

@@ -1,5 +1,6 @@
 #include <iostream>
 #include <memory>
+#include <utility>
 
 #include "box2d/box2d.h"
 #include "flecs.h"
@@ -12,6 +13,7 @@
 #include "modules/Physics.h"
 #include "modules/Reflection.h"
 #include "modules/Rendering.h"
+#include "modules/Simulation.h"
 
 // constexpr int SCREEN_WIDTH = 2560;
 // constexpr int SCREEN_HEIGHT = 1440;
@@ -33,19 +35,33 @@ int main() {
   Reflection::Register<RenderTexture2D>(world);
 
   Rendering::Import(world);
+  GameCamera::Import(world);
   Movement::Import(world);
   Character::Import(world);
-  GameCamera::Import(world);
   MapManage::Import(world);
   Physics::Import(world);
 
-  Physics::CreateBox2DWorld(world);
+  const auto preDraw = world.pipeline().with(flecs::System).with<Rendering::Phases::PreDraw>().build();
+  const auto background = world.pipeline().with(flecs::System).with<Rendering::Phases::Background>().build();
+  const auto draw = world.pipeline().with(flecs::System).with<Rendering::Phases::Draw>().build();
+  const auto postDraw = world.pipeline().with(flecs::System).with<Rendering::Phases::PostDraw>().build();
 
-  world.component<Rendering::MainWindow>()
-      .add(flecs::Singleton)
-      .set<Rendering::WindowSize>({SCREEN_WIDTH, SCREEN_HEIGHT})
-      .set<Rendering::WindowTitle>({"raylib game cpp"})
-      .set<Rendering::WindowFPS>({60});
+  const auto begin2D = world.pipeline().with(flecs::System).with<GameCamera::Phases::Begin2D>().build();
+  const auto end2D = world.pipeline().with(flecs::System).with<GameCamera::Phases::End2D>().build();
+
+  const auto moveUpdate = world.pipeline().with(flecs::System).with<Movement::Phases::Update>().build();
+  const auto cameraFollow = world.pipeline().with(flecs::System).with<Movement::Phases::CameraFollow>().build();
+
+  const auto characterUpdate = world.pipeline().with(flecs::System).with<Character::Phases::Update>().build();
+
+  const auto fixedUpdate = world.pipeline().with(flecs::System).with<Simulation::FixedUpdate>().build();
+
+  const auto mainWindow = world.component<Rendering::MainWindow>()
+                              .add(flecs::Singleton)
+                              .set<Rendering::WindowSize>({SCREEN_WIDTH, SCREEN_HEIGHT})
+                              .set<Rendering::WindowTitle>({"raylib game cpp"})
+                              .set<Rendering::WindowFPS>({60});
+  auto windowFPS = mainWindow.get_mut<Rendering::WindowFPS>();
 
   world.component<Rendering::RenderTargetSize>()
       .add(flecs::Singleton)
@@ -99,10 +115,36 @@ int main() {
       .set<Movement::Velocity>({Vector2{0.0f, 0.0f}})
       .set<Movement::MoveSpeed>({85.0f});
 
-  while (world.progress(GetFrameTime())) {
-    if (WindowShouldClose()) {
-      break;
+  float timeStep = 1.0f / 60.0f;
+  Physics::CreateBox2DWorld(world, timeStep);
+  float accumulator = 0.0f;
+  ecs_progress(world, 0);
+
+  while (!WindowShouldClose()) {
+
+    if (IsKeyPressed(KEY_PAGE_UP)) {
+      SetTargetFPS(std::min(240, GetFPS() + 10));
     }
+    if (IsKeyPressed(KEY_PAGE_DOWN)) {
+      SetTargetFPS(std::max(60, GetFPS() - 10));
+    }
+
+    ecs_run_pipeline(world, moveUpdate, GetFrameTime());
+
+    accumulator += GetFrameTime();
+    while (accumulator >= timeStep) {
+      ecs_run_pipeline(world, fixedUpdate, timeStep);
+      ecs_run_pipeline(world, characterUpdate, GetFrameTime());
+      accumulator -= timeStep;
+    }
+    ecs_run_pipeline(world, cameraFollow, GetFrameTime());
+
+    ecs_run_pipeline(world, preDraw, GetFrameTime());
+    ecs_run_pipeline(world, background, GetFrameTime());
+    ecs_run_pipeline(world, begin2D, GetFrameTime());
+    ecs_run_pipeline(world, draw, GetFrameTime());
+    ecs_run_pipeline(world, end2D, GetFrameTime());
+    ecs_run_pipeline(world, postDraw, GetFrameTime());
   }
 
   world.quit();

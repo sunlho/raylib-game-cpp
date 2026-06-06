@@ -200,6 +200,7 @@ void RegisterCharacterSprites(flecs::world &world) {
         Vector2 origin = spriteSet.useCenterOrigin ? Vector2{roundf(dest.width * 0.5f), roundf(dest.height * 0.5f)} : spriteSet.origin;
 
         DrawTexturePro(animation.texture, src, dest, origin, 0.0f, WHITE);
+        DrawText(TextFormat("Pos: (%.2f, %.2f)", position.value.x, position.value.y), 10, 10, 20, WHITE);
       });
 
   world.system<SpriteSet>("Unload Character Sprites")

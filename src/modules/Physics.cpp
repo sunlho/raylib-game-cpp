@@ -2,30 +2,22 @@
 
 #include "Physics.h"
 #include "Reflection.h"
+#include "Simulation.h"
 
 namespace Physics {
 namespace {
-
-float timeStep = 1.0f / 60.0f;
-float accumulator = 0.0f;
-
-void fixedUpdate(flecs::iter &it, size_t i, const PhysicsWorld &world) {
-  accumulator += it.delta_time();
-  while (accumulator >= timeStep) {
-    b2World_Step(world.id, timeStep, 1);
-    accumulator -= timeStep;
-  }
-}
 
 } // namespace
 
 void Import(flecs::world &world) {
   world.system<const PhysicsWorld>("fixed update")
-      .kind(flecs::PreUpdate)
-      .each(fixedUpdate);
+      .kind<Simulation::FixedUpdate>()
+      .each([](flecs::iter &it, size_t i, const PhysicsWorld &world) {
+        b2World_Step(world.id, world.timeStep, 1);
+      });
 }
 
-void CreateBox2DWorld(flecs::world &world) {
+void CreateBox2DWorld(flecs::world &world, float step) {
   Reflection::Register<b2WorldId>(world);
   Reflection::Register<PhysicsWorld>(world);
 
@@ -34,7 +26,7 @@ void CreateBox2DWorld(flecs::world &world) {
 
   world.entity("box2d world")
       .add<PhysicsWorld>()
-      .set<PhysicsWorld>({worldId});
+      .set<PhysicsWorld>({worldId, step});
 }
 
 } // namespace Physics

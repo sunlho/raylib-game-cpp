@@ -203,6 +203,8 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
 void MapManage::Import(flecs::world &world) {
   Reflection::Register<Tilemap::MapBounds>(world);
   Reflection::Register<MapPath>(world);
+  Reflection::Register<LoadedMapState>(world);
+  Reflection::Register<MapCacheState>(world);
   Reflection::Register<MapState>(world);
 
   world.component<Tilemap::MapBounds>()
