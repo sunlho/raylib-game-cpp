@@ -7,4 +7,6 @@ struct PreUpdate {};
 struct FixedUpdate {};
 struct PostUpdate {};
 
+struct TestUpdate {};
+
 } // namespace Simulation

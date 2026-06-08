@@ -75,34 +75,6 @@ void Rendering::Import(flecs::world &world) {
   Reflection::Register<RenderTargetState>(world);
   Reflection::Register<WindowFPS>(world);
 
-  world.observer<const WindowTitle>("Update Window Title")
-      .event(flecs::OnSet)
-      .each([](const WindowTitle &title) {
-        if (IsWindowReady()) {
-          SetWindowTitle(title.value.c_str());
-        }
-      });
-  world.observer<WindowSize>("Update Window Size")
-      .event(flecs::OnSet)
-      .each([](const WindowSize &size) {
-        if (IsWindowReady()) {
-          SetWindowSize(size.dimension.x, size.dimension.y);
-        }
-      });
-  world.observer<WindowFPS>("Update Target FPS")
-      .event(flecs::OnSet)
-      .each([](const WindowFPS &fps) {
-        if (IsWindowReady()) {
-          SetTargetFPS(fps.target);
-        }
-      });
-  world.system<const WindowTitle, const WindowSize, const WindowFPS>("InitializeWindow")
-      .kind(flecs::OnStart)
-      .each([](const WindowTitle &title, const WindowSize &size, const WindowFPS &fps) {
-        InitWindow(size.dimension.x, size.dimension.y, title.value.c_str());
-        SetTargetFPS(fps.target);
-      });
-
   world.system("BeginDrawing")
       .kind<Phases::PreDraw>()
       .run([](flecs::iter &it) {

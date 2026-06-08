@@ -14,6 +14,7 @@
 #include "modules/Reflection.h"
 #include "modules/Rendering.h"
 #include "modules/Simulation.h"
+#include "modules/Utils.h"
 
 // constexpr int SCREEN_WIDTH = 2560;
 // constexpr int SCREEN_HEIGHT = 1440;
@@ -27,6 +28,10 @@ constexpr int BASE_WIDTH = 640;
 constexpr int BASE_HEIGHT = 360;
 
 int main() {
+
+  InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "raylib game cpp");
+  SetTargetFPS(60);
+
   flecs::world world;
   world.set<flecs::Rest>({});
   world.import<flecs::stats>();
@@ -41,18 +46,20 @@ int main() {
   MapManage::Import(world);
   Physics::Import(world);
 
-  const auto preDraw = world.pipeline().with(flecs::System).with<Rendering::Phases::PreDraw>().build();
-  const auto background = world.pipeline().with(flecs::System).with<Rendering::Phases::Background>().build();
-  const auto draw = world.pipeline().with(flecs::System).with<Rendering::Phases::Draw>().build();
-  const auto postDraw = world.pipeline().with(flecs::System).with<Rendering::Phases::PostDraw>().build();
+  const auto preDraw = buildPipeline<Rendering::Phases::PreDraw>(world);
+  const auto background = buildPipeline<Rendering::Phases::Background>(world);
+  const auto draw = buildPipeline<Rendering::Phases::Draw>(world);
+  const auto postDraw = buildPipeline<Rendering::Phases::PostDraw>(world);
 
-  const auto begin2D = world.pipeline().with(flecs::System).with<GameCamera::Phases::Begin2D>().build();
-  const auto end2D = world.pipeline().with(flecs::System).with<GameCamera::Phases::End2D>().build();
+  const auto begin2D = buildPipeline<GameCamera::Phases::Begin2D>(world);
+  const auto end2D = buildPipeline<GameCamera::Phases::End2D>(world);
 
-  const auto moveUpdate = world.pipeline().with(flecs::System).with<Movement::Phases::Update>().build();
-  const auto cameraFollow = world.pipeline().with(flecs::System).with<Movement::Phases::CameraFollow>().build();
+  const auto moveUpdate = buildPipeline<Movement::Phases::Update>(world);
+  const auto cameraFollow = buildPipeline<Movement::Phases::CameraFollow>(world);
 
-  const auto characterUpdate = world.pipeline().with(flecs::System).with<Character::Phases::Update>().build();
+  const auto characterUpdate = buildPipeline<Character::Phases::Update>(world);
+
+  const auto fixedUpdate = buildPipeline<Simulation::FixedUpdate>(world);
 
   const auto fixedUpdate = world.pipeline().with(flecs::System).with<Simulation::FixedUpdate>().build();
 
@@ -129,15 +136,17 @@ int main() {
       SetTargetFPS(std::max(60, GetFPS() - 10));
     }
 
+    ecs_frame_begin(world, GetFrameTime());
+
     ecs_run_pipeline(world, moveUpdate, GetFrameTime());
 
     accumulator += GetFrameTime();
     while (accumulator >= timeStep) {
       ecs_run_pipeline(world, fixedUpdate, timeStep);
-      ecs_run_pipeline(world, characterUpdate, GetFrameTime());
+      ecs_run_pipeline(world, characterUpdate, timeStep);
+      ecs_run_pipeline(world, cameraFollow, timeStep);
       accumulator -= timeStep;
     }
-    ecs_run_pipeline(world, cameraFollow, GetFrameTime());
 
     ecs_run_pipeline(world, preDraw, GetFrameTime());
     ecs_run_pipeline(world, background, GetFrameTime());
@@ -145,6 +154,8 @@ int main() {
     ecs_run_pipeline(world, draw, GetFrameTime());
     ecs_run_pipeline(world, end2D, GetFrameTime());
     ecs_run_pipeline(world, postDraw, GetFrameTime());
+
+    ecs_frame_end(world);
   }
 
   world.quit();

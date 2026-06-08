@@ -13,7 +13,7 @@ void Import(flecs::world &world) {
   world.system<const PhysicsWorld>("fixed update")
       .kind<Simulation::FixedUpdate>()
       .each([](flecs::iter &it, size_t i, const PhysicsWorld &world) {
-        b2World_Step(world.id, world.timeStep, 1);
+        b2World_Step(world.id, world.timeStep, 4);
       });
 }
 
