@@ -1,15 +1,16 @@
-#include "CharacterInternal.h"
 
 #include <algorithm>
 #include <cstring>
 #include <utility>
 
-#include "modules/Assets.h"
-#include "modules/Rendering.h"
 #include "raylib.h"
 #include "raymath.h"
 #include "webp/decode.h"
 #include "webp/demux.h"
+
+#include "CharacterInternal.h"
+#include "modules/Assets.h"
+#include "modules/Rendering.h"
 
 namespace Character {
 bool LoadWebPAnimation(std::string_view path, SpriteAnimation &animation, int &outFrames) {
@@ -77,8 +78,8 @@ bool LoadWebPAnimation(std::string_view path, SpriteAnimation &animation, int &o
 }
 
 void RegisterCharacterSprites(flecs::world &world) {
-  world.system<SpriteSet, AnimationController>("Load Character Sprites")
-      .kind<Character::Phases::Update>()
+  world.observer<SpriteSet, AnimationController>("Load Character Sprites")
+      .event(flecs::OnSet)
       .each([](SpriteSet &spriteSet, AnimationController &controller) {
         if (spriteSet.loaded) {
           return;

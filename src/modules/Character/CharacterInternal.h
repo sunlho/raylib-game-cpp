@@ -3,7 +3,7 @@
 #include <string>
 #include <string_view>
 
-#include "modules/Character/Character.h"
+#include "Character.h"
 
 namespace Character {
 
@@ -14,5 +14,6 @@ bool LoadWebPAnimation(std::string_view path, SpriteAnimation &animation, int &o
 
 void RegisterCharacterAnimation(flecs::world &world);
 void RegisterCharacterSprites(flecs::world &world);
+void RegisterCharacterPhysics(flecs::world &world);
 
 } // namespace Character

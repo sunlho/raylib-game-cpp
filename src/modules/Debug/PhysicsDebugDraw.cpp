@@ -1,5 +1,3 @@
-#include "PhysicsDebugDraw.h"
-
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -8,6 +6,9 @@
 #include "box2d/box2d.h"
 #include "raylib.h"
 
+#include "PhysicsDebugDraw.h"
+#include "modules/Physics.h"
+#include "modules/Reflection.h"
 #include "modules/Rendering.h"
 
 namespace {
@@ -178,19 +179,8 @@ b2DebugDraw CreateDebugDraw() {
 #if !defined(NDEBUG)
 void DrawPhysicsDebugWorld(flecs::iter &it) {
   auto world = it.world();
-  auto worldEntity = world.singleton<b2WorldId>();
-  if (!worldEntity.is_valid()) {
-    return;
-  }
-
-  const b2WorldId physicsWorld = worldEntity.get<b2WorldId>();
-  if (!b2World_IsValid(physicsWorld)) {
-    return;
-  }
-
-  auto debugDrawEntity = world.singleton<b2DebugDraw>();
-  auto &debugDraw = debugDrawEntity.get_mut<b2DebugDraw>();
-  b2World_Draw(physicsWorld, &debugDraw);
+  auto debugDraw = world.get<b2DebugDraw>();
+  b2World_Draw(Physics::Id, &debugDraw);
 }
 #endif
 

@@ -1,12 +1,13 @@
-#include "CharacterInternal.h"
 
 #include <algorithm>
 #include <cmath>
 
-#include "modules/Movement.h"
-#include "modules/Reflection.h"
 #include "raylib.h"
 #include "raymath.h"
+
+#include "CharacterInternal.h"
+#include "modules/Movement.h"
+#include "modules/Reflection.h"
 
 namespace Character {
 void RegisterCharacterAnimation(flecs::world &world) {

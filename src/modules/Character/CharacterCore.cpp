@@ -1,8 +1,8 @@
-#include "CharacterInternal.h"
-
 #include <algorithm>
 #include <cmath>
 #include <utility>
+
+#include "CharacterInternal.h"
 
 namespace Character {
 namespace {

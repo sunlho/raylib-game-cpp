@@ -23,7 +23,9 @@ add_executable(${PROJECT_NAME}
     src/modules/Character/Character.cpp
     src/modules/Character/CharacterAnimation.cpp
     src/modules/Character/CharacterCore.cpp
+    src/modules/Character/CharacterPhysics.cpp
     src/modules/Character/CharacterSprites.cpp
+    src/modules/Debug/PhysicsDebugDraw.cpp
 
     src/modules/Tilemap/Tilemap.cpp
     src/modules/Tilemap/TilemapChunks.cpp

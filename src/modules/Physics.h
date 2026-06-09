@@ -7,6 +7,8 @@ typedef struct PhysicsWorld {
   float timeStep;
 } PhysicsWorld;
 
+extern b2WorldId Id;
+
 void Import(flecs::world &world);
 void CreateBox2DWorld(flecs::world &world, float step);
 } // namespace Physics

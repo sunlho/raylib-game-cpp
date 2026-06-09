@@ -8,6 +8,7 @@
 
 #include "modules/Camera.h"
 #include "modules/Character/Character.h"
+#include "modules/Debug/PhysicsDebugDraw.h"
 #include "modules/MapManage.h"
 #include "modules/Movement.h"
 #include "modules/Physics.h"
@@ -45,6 +46,7 @@ int main() {
   Character::Import(world);
   MapManage::Import(world);
   Physics::Import(world);
+  PhysicsDebugDraw::Import(world);
 
   const auto preDraw = buildPipeline<Rendering::Phases::PreDraw>(world);
   const auto background = buildPipeline<Rendering::Phases::Background>(world);
@@ -61,15 +63,6 @@ int main() {
 
   const auto fixedUpdate = buildPipeline<Simulation::FixedUpdate>(world);
 
-  const auto fixedUpdate = world.pipeline().with(flecs::System).with<Simulation::FixedUpdate>().build();
-
-  const auto mainWindow = world.component<Rendering::MainWindow>()
-                              .add(flecs::Singleton)
-                              .set<Rendering::WindowSize>({SCREEN_WIDTH, SCREEN_HEIGHT})
-                              .set<Rendering::WindowTitle>({"raylib game cpp"})
-                              .set<Rendering::WindowFPS>({60});
-  auto windowFPS = mainWindow.get_mut<Rendering::WindowFPS>();
-
   world.component<Rendering::RenderTargetSize>()
       .add(flecs::Singleton)
       .set<Rendering::RenderTargetSize>({Vector2{static_cast<float>(BASE_WIDTH), static_cast<float>(BASE_HEIGHT)}});
@@ -84,11 +77,7 @@ int main() {
 
   world.component<GameCamera::MainCamera>()
       .add(flecs::Singleton)
-      .set<GameCamera::CameraState>({
-          Camera2D{Vector2{0.0f, 0.0f}, Vector2{0.0f, 0.0f}, 0.0f, 1.0f},
-          true,
-          true,
-      });
+      .set<GameCamera::CameraState>({Camera2D{Vector2{0.0f, 0.0f}, Vector2{0.0f, 0.0f}, 0.0f, 1.0f}, true, true});
 
   MapManage::SetMapPath(world, "Map.tmx");
 
@@ -123,7 +112,6 @@ int main() {
       .set<Movement::MoveSpeed>({85.0f});
 
   float timeStep = 1.0f / 60.0f;
-  Physics::CreateBox2DWorld(world, timeStep);
   float accumulator = 0.0f;
   ecs_progress(world, 0);
 

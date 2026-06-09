@@ -19,5 +19,6 @@ void Import(flecs::world &world) {
 
   RegisterCharacterAnimation(world);
   RegisterCharacterSprites(world);
+  RegisterCharacterPhysics(world);
 }
 } // namespace Character
