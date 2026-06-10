@@ -2,9 +2,12 @@
 #include <algorithm>
 #include <iostream>
 
+#include "box2d/box2d.h"
+
 #include "Camera.h"
 #include "Character/Character.h"
 #include "Movement.h"
+#include "Physics.h"
 #include "Reflection.h"
 #include "Rendering.h"
 #include "Simulation.h"
@@ -69,11 +72,13 @@ void Movement::Import(flecs::world &world) {
         velocity.value = Vector2Scale(direction, speed.value);
       });
 
-  world.system<Rendering::Position, const Velocity>("Move Entities")
+  world.system<Rendering::Position, const Velocity, const Physics::PhysicsBody>("Move Entities")
       .kind<Simulation::FixedUpdate>()
-      .each([](flecs::iter &it, size_t i, Rendering::Position &position, const Velocity &velocity) {
+      .each([](flecs::iter &it, size_t i, Rendering::Position &position, const Velocity &velocity, const Physics::PhysicsBody &physicsBody) {
         const float deltaTime = it.delta_time();
-        position.value = Vector2Add(position.value, Vector2Scale(velocity.value, deltaTime));
+        b2Body_SetLinearVelocity(physicsBody.id, b2Vec2{velocity.value.x, velocity.value.y});
+        b2Vec2 bodyPosition = b2Body_GetPosition(physicsBody.id);
+        position.value = Vector2{bodyPosition.x, bodyPosition.y};
       });
 
   world.system<Rendering::Position, const Character::SpriteSet, const Character::AnimationController>("Clamp Player To Map Bounds")

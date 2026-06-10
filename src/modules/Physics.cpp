@@ -12,6 +12,10 @@ namespace {
 b2WorldId Id = b2_nullWorldId;
 
 void Import(flecs::world &world) {
+  Reflection::Register<b2WorldId>(world);
+  Reflection::Register<b2BodyId>(world);
+  Reflection::Register<PhysicsWorld>(world);
+
   CreateBox2DWorld(world, 1.0f / 60.0f);
 
   world.system<const PhysicsWorld>("fixed update")
@@ -25,8 +29,6 @@ void CreateBox2DWorld(flecs::world &world, float step) {
   if (b2World_IsValid(Id)) {
     return;
   }
-  Reflection::Register<b2WorldId>(world);
-  Reflection::Register<PhysicsWorld>(world);
 
   b2WorldDef worldDef = b2DefaultWorldDef();
   worldDef.gravity = b2Vec2{0.0f, 0.0f};

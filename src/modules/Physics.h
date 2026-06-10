@@ -7,6 +7,10 @@ typedef struct PhysicsWorld {
   float timeStep;
 } PhysicsWorld;
 
+typedef struct PhysicsBody {
+  b2BodyId id;
+} PhysicsBody;
+
 extern b2WorldId Id;
 
 void Import(flecs::world &world);

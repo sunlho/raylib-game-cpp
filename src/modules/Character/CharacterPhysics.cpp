@@ -7,9 +7,9 @@
 namespace Character {
 
 void RegisterCharacterPhysics(flecs::world &world) {
-  world.observer<CharacterInfo, SpriteSet, Rendering::Position>("Create Character Physics")
+  world.observer<CharacterInfo, SpriteSet, Rendering::Position, Physics::PhysicsBody>("Create Character Physics")
       .event(flecs::OnSet)
-      .each([](CharacterInfo &info, SpriteSet &spriteSet, Rendering::Position &position) {
+      .each([](CharacterInfo &info, SpriteSet &spriteSet, Rendering::Position &position, Physics::PhysicsBody &physicsBody) {
         b2BodyDef bodyDef = b2DefaultBodyDef();
         bodyDef.type = b2_dynamicBody;
         bodyDef.position = b2Vec2{position.value.x, position.value.y};
@@ -20,6 +20,7 @@ void RegisterCharacterPhysics(flecs::world &world) {
         shapeDef.density = 1.0f;
         shapeDef.material.friction = 0.3f;
         b2CreateCircleShape(body, &shapeDef, &circle);
+        physicsBody.id = body;
       });
 }
 
