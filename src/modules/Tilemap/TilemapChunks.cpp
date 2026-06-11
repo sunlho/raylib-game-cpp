@@ -5,6 +5,8 @@
 #include <cstddef>
 #include <cstdint>
 
+namespace Tilemap {
+
 namespace TilemapInternal {
 
 int CeilDiv(int value, int divisor) {
@@ -142,3 +144,5 @@ void BuildObjectChunks(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGr
 }
 
 } // namespace TilemapInternal
+
+} // namespace Tilemap

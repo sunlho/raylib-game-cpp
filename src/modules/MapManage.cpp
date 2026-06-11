@@ -7,16 +7,16 @@
 #include <utility>
 #include <vector>
 
+#include "Physics.h"
 #include "modules/Reflection.h"
 #include "modules/Rendering.h"
 #include "modules/Tilemap/Tilemap.h"
-#include "modules/Tilemap/TilemapInternal.h"
 
 namespace {
 
 class ChunkRenderable final : public Rendering::Renderable {
 public:
-  ChunkRenderable(std::vector<Tilemap::ChunkTile> tiles, std::shared_ptr<TilemapInternal::TilemapTextureBank> textureBank)
+  ChunkRenderable(std::vector<Tilemap::ChunkTile> tiles, std::shared_ptr<Tilemap::TilemapTextureBank> textureBank)
       : tiles_(std::move(tiles)), textureBank_(std::move(textureBank)) {
   }
 
@@ -49,11 +49,11 @@ public:
 
 private:
   std::vector<Tilemap::ChunkTile> tiles_;
-  std::shared_ptr<TilemapInternal::TilemapTextureBank> textureBank_;
+  std::shared_ptr<Tilemap::TilemapTextureBank> textureBank_;
 };
 
 struct LoadedMapState {
-  std::shared_ptr<TilemapInternal::TilemapTextureBank> textureBank;
+  std::shared_ptr<Tilemap::TilemapTextureBank> textureBank;
 };
 
 struct CachedMapEntry {
@@ -129,7 +129,7 @@ Tilemap::LoadedMap *GetOrLoadMap(MapCacheState &cacheState, const std::string &p
   return LoadMapIntoCache(cacheState, path);
 }
 
-void CreateChunkEntity(flecs::world &world, const Tilemap::Chunk &chunk, const std::shared_ptr<TilemapInternal::TilemapTextureBank> &textureBank, flecs::entity layerGroup) {
+void CreateChunkEntity(flecs::world &world, const Tilemap::Chunk &chunk, const std::shared_ptr<Tilemap::TilemapTextureBank> &textureBank, flecs::entity layerGroup) {
   const Rectangle chunkRect = chunk.destRect;
   const float chunkWidth = chunkRect.width;
   const float chunkHeight = chunkRect.height;
@@ -194,6 +194,14 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
       }
     }
 
+    for (const auto &chunkTile : chunk.tiles) {
+      const auto tileset = Tilemap::FindTilesetByGid(*loadedState.textureBank, chunkTile.tileGid);
+      const auto tileObject = tileset->getTile(chunkTile.tileGid);
+      if (tileObject && !tileObject->collisions.empty()) {
+        Tilemap::CreateCollisionEntity(world, Physics::Id, tileObject->collisions, chunkTile.destRect, chunk.layerIndex, groupIt->second);
+      }
+    }
+
     CreateChunkEntity(world, chunk, loadedState.textureBank, groupIt->second);
   }
 }
@@ -202,6 +210,7 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
 
 void MapManage::Import(flecs::world &world) {
   Reflection::Register<Tilemap::MapBounds>(world);
+  Reflection::Register<Tilemap::CollisionData>(world);
   Reflection::Register<MapPath>(world);
   Reflection::Register<LoadedMapState>(world);
   Reflection::Register<MapCacheState>(world);

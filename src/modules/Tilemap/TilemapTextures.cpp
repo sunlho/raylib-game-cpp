@@ -2,31 +2,13 @@
 
 #include <filesystem>
 
+#include "Tilemap.h"
 #include "modules/Assets.h"
 
+namespace Tilemap {
+
 namespace TilemapInternal {
-
-TilemapTextureBank::~TilemapTextureBank() {
-  for (auto &tileset : tilesets) {
-    if (tileset.texture.id != 0) {
-      UnloadTexture(tileset.texture);
-      tileset.texture = Texture2D{};
-    }
-  }
-}
-
-int FindTilesetIndexByGid(const TilemapTextureBank &textureBank, std::uint32_t gid) {
-  for (std::size_t i = 0; i < textureBank.tilesets.size(); ++i) {
-    const auto &tileset = textureBank.tilesets[i];
-    if (gid >= tileset.firstGid && gid <= tileset.lastGid) {
-      return static_cast<int>(i);
-    }
-  }
-
-  return -1;
-}
-
-Rectangle ComputeSourceRect(const TilemapTilesetTexture &tileset, std::uint32_t gid) {
+Rectangle ComputeSourceRect(const TilemapTileset &tileset, std::uint32_t gid) {
   const std::uint32_t localId = gid - tileset.firstGid;
 
   if (tileset.columnCount <= 0) {
@@ -69,7 +51,7 @@ std::shared_ptr<TilemapTextureBank> LoadTilesetTextures(const tmx::Map &tilemap,
       continue;
     }
 
-    TilemapTilesetTexture loaded;
+    TilemapTileset loaded;
     loaded.texture = LoadTexture(texturePath.string().c_str());
     loaded.firstGid = tileset.getFirstGID();
     loaded.lastGid = tileset.getFirstGID() + tileset.getTileCount() - 1;
@@ -90,8 +72,8 @@ std::shared_ptr<TilemapTextureBank> LoadTilesetTextures(const tmx::Map &tilemap,
       tileObject.collisions.reserve(objects.size());
 
       for (const auto &object : objects) {
-        TileCollision collision;
-        collision.shape = static_cast<TileCollisionShape>(object.getShape());
+        Tilemap::CollisionData collision;
+        collision.shape = static_cast<Tilemap::CollisionShape>(object.getShape());
         auto const aabb = object.getAABB();
         collision.AABB = Rectangle{aabb.left, aabb.top, aabb.width, aabb.height};
         collision.position = Vector2{object.getPosition().x, object.getPosition().y};
@@ -116,3 +98,35 @@ std::shared_ptr<TilemapTextureBank> LoadTilesetTextures(const tmx::Map &tilemap,
 }
 
 } // namespace TilemapInternal
+
+TilemapTextureBank::~TilemapTextureBank() {
+  for (auto &tileset : tilesets) {
+    if (tileset.texture.id != 0) {
+      UnloadTexture(tileset.texture);
+      tileset.texture = Texture2D{};
+    }
+  }
+}
+
+int FindTilesetIndexByGid(const TilemapTextureBank &textureBank, std::uint32_t gid) {
+  for (std::size_t i = 0; i < textureBank.tilesets.size(); ++i) {
+    const auto &tileset = textureBank.tilesets[i];
+    if (gid >= tileset.firstGid && gid <= tileset.lastGid) {
+      return static_cast<int>(i);
+    }
+  }
+
+  return -1;
+}
+
+const TilemapTileset *FindTilesetByGid(const TilemapTextureBank &textureBank, std::uint32_t gid) {
+  for (auto &tileset : textureBank.tilesets) {
+    if (gid >= tileset.firstGid && gid <= tileset.lastGid) {
+      return &tileset;
+    }
+  }
+
+  return nullptr;
+}
+
+} // namespace Tilemap

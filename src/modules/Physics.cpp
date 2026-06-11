@@ -23,6 +23,12 @@ void Import(flecs::world &world) {
       .each([](flecs::iter &it, size_t i, const PhysicsWorld &world) {
         b2World_Step(world.id, world.timeStep, 4);
       });
+
+  world.observer<b2BodyId>("Destroy Body")
+      .event(flecs::OnRemove)
+      .each([](flecs::entity, const b2BodyId &bodyId) {
+        b2DestroyBody(bodyId);
+      });
 }
 
 void CreateBox2DWorld(flecs::world &world, float step) {

@@ -36,6 +36,7 @@ int main() {
   flecs::world world;
   world.set<flecs::Rest>({});
   world.import<flecs::stats>();
+  ecs_entity_t dequeue_rest = ecs_lookup(world, "flecs.rest.DequeueRest");
 
   Reflection::Register<Rectangle>(world);
   Reflection::Register<RenderTexture2D>(world);
@@ -143,6 +144,8 @@ int main() {
     ecs_run_pipeline(world, draw, GetFrameTime());
     ecs_run_pipeline(world, end2D, GetFrameTime());
     ecs_run_pipeline(world, postDraw, GetFrameTime());
+
+    ecs_run(world, dequeue_rest, GetFrameTime(), NULL);
 
     ecs_frame_end(world);
   }
