@@ -9,6 +9,9 @@
 namespace Physics {
 namespace {
 
+bool disableDebugDraw = true;
+flecs::system drawDebugSystem;
+
 } // namespace
 
 b2WorldId Id = b2_nullWorldId;
@@ -47,13 +50,23 @@ module::module(flecs::world &world) {
       .add(flecs::Singleton);
   world.set<b2DebugDraw>(PhysicsDebugDraw::CreateDebugDraw());
 
-  world.system("Draw Physics Debug World")
-      .kind<Rendering::Phases::Draw>()
-      .run([](flecs::iter &it) {
-        auto world = it.world();
-        auto debugDraw = world.get<b2DebugDraw>();
-        b2World_Draw(Physics::Id, &debugDraw);
-      });
+  drawDebugSystem = world.system("Draw Physics Debug World").kind<Rendering::Phases::Draw>().run([](flecs::iter &it) {
+    auto world = it.world();
+    auto debugDraw = world.get<b2DebugDraw>();
+    b2World_Draw(Physics::Id, &debugDraw);
+  });
+  drawDebugSystem.disable();
+#endif
+}
+
+void changeDebugDrawSystemEnabled() {
+#if !defined(NDEBUG)
+  if (disableDebugDraw) {
+    drawDebugSystem.enable();
+  } else {
+    drawDebugSystem.disable();
+  }
+  disableDebugDraw = !disableDebugDraw;
 #endif
 }
 

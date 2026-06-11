@@ -172,7 +172,7 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
   DestroyCurrentMap(mapState);
   ClearMapData(world);
 
-  mapState.mapRoot = world.entity("map root");
+  mapState.mapRoot = world.entity("MapRoot");
   mapState.currentPath = mapPath.value;
 
   auto &mapBounds = world.get_mut<Tilemap::MapBounds>();
@@ -242,7 +242,7 @@ module::module(flecs::world &world) {
 }
 
 void SetMapPath(flecs::world &world, const std::string &path) {
-  auto mapEntity = world.entity("map");
+  auto mapEntity = world.entity("Map");
   mapEntity.set<MapPath>(MapPath{path});
 
   if (IsWindowReady()) {

@@ -15,7 +15,7 @@ struct Velocity {
 };
 
 struct MoveSpeed {
-  float value = 180.0f;
+  float value;
 };
 
 struct PlayerControlled {};

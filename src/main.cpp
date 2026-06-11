@@ -28,6 +28,8 @@ constexpr int SCREEN_HEIGHT = 720;
 constexpr int BASE_WIDTH = 640;
 constexpr int BASE_HEIGHT = 360;
 
+struct DebugTag {};
+
 int main() {
 
   InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "raylib game cpp");
@@ -95,7 +97,7 @@ int main() {
   };
   playerSprites.scale = 1.0f;
 
-  world.entity("player")
+  world.entity("Player")
       .add<Character::PlayerTag>()
       .add<Movement::PlayerControlled>()
       .add<Movement::CameraFollowTag>()
@@ -114,6 +116,9 @@ int main() {
   ecs_progress(world, 0);
 
   while (!WindowShouldClose()) {
+    if (IsKeyPressed(KEY_F1)) {
+      Physics::changeDebugDrawSystemEnabled();
+    }
 
     if (IsKeyPressed(KEY_PAGE_UP)) {
       SetTargetFPS(std::min(240, GetFPS() + 10));
