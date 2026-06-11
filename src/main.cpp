@@ -38,16 +38,12 @@ int main() {
   world.import<flecs::stats>();
   ecs_entity_t dequeue_rest = ecs_lookup(world, "flecs.rest.DequeueRest");
 
-  Reflection::Register<Rectangle>(world);
-  Reflection::Register<RenderTexture2D>(world);
-
-  Rendering::Import(world);
-  GameCamera::Import(world);
-  Movement::Import(world);
-  Character::Import(world);
-  MapManage::Import(world);
-  Physics::Import(world);
-  PhysicsDebugDraw::Import(world);
+  world.import<Rendering::module>();
+  world.import<GameCamera::module>();
+  world.import<Movement::module>();
+  world.import<Character::module>();
+  world.import<MapManage::module>();
+  world.import<Physics::module>();
 
   const auto preDraw = buildPipeline<Rendering::Phases::PreDraw>(world);
   const auto background = buildPipeline<Rendering::Phases::Background>(world);

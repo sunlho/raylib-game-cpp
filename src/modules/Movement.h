@@ -4,6 +4,7 @@
 #include "raylib.h"
 
 namespace Movement {
+
 struct Phases {
   struct Update {};
   struct CameraFollow {};
@@ -20,6 +21,8 @@ struct MoveSpeed {
 struct PlayerControlled {};
 struct CameraFollowTag {};
 
-void Import(flecs::world &world);
+struct module {
+  module(flecs::world &world);
+};
 
 } // namespace Movement

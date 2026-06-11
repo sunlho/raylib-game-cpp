@@ -7,7 +7,7 @@
 namespace Character {
 
 void RegisterCharacterPhysics(flecs::world &world) {
-  world.observer<CharacterInfo, SpriteSet, Rendering::Position, Physics::PhysicsBody>("Create Character Physics")
+  world.observer<CharacterInfo, SpriteSet, Rendering::Position, Physics::PhysicsBody>("Create Character Physics Observer")
       .event(flecs::OnSet)
       .each([](CharacterInfo &info, SpriteSet &spriteSet, Rendering::Position &position, Physics::PhysicsBody &physicsBody) {
         b2BodyDef bodyDef = b2DefaultBodyDef();

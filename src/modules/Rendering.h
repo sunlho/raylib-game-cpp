@@ -7,6 +7,7 @@
 #include "raylib.h"
 
 namespace Rendering {
+
 struct Phases {
   struct PreDraw {};
   struct Background {};
@@ -43,10 +44,6 @@ struct CircleRenderable final : Renderable {
 
 struct MainWindow {};
 
-struct WindowSize {
-  Vector2 dimension;
-};
-
 struct RenderTargetSize {
   Vector2 dimension;
 };
@@ -55,14 +52,8 @@ struct RenderTargetState {
   bool active = false;
 };
 
-struct WindowTitle {
-  std::string value;
+struct module {
+  module(flecs::world &world);
 };
-
-struct WindowFPS {
-  int target;
-};
-
-void Import(flecs::world &world);
 
 } // namespace Rendering

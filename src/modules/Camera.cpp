@@ -6,8 +6,8 @@
 
 namespace GameCamera {
 
-void Import(flecs::world &world) {
-
+module::module(flecs::world &world) {
+  Reflection::Register<Camera2D>(world);
   Reflection::Register<CameraState>(world);
 
   world.system("Auto Center Camera Offset")
@@ -20,8 +20,7 @@ void Import(flecs::world &world) {
           return;
         }
 
-        auto renderTargetSizeEntity = world.singleton<Rendering::RenderTargetSize>();
-        const auto &renderTargetSize = renderTargetSizeEntity.get<Rendering::RenderTargetSize>();
+        const auto renderTargetSize = world.get<Rendering::RenderTargetSize>();
 
         cameraState.value.offset = Vector2{
             renderTargetSize.dimension.x * 0.5f,

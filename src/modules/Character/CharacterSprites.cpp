@@ -13,6 +13,8 @@
 #include "modules/Rendering.h"
 
 namespace Character {
+namespace {
+
 bool LoadWebPAnimation(std::string_view path, SpriteAnimation &animation, int &outFrames) {
   const auto bytes = Assets::ReadBinary(path);
   if (!bytes || bytes->empty()) {
@@ -77,8 +79,10 @@ bool LoadWebPAnimation(std::string_view path, SpriteAnimation &animation, int &o
   return true;
 }
 
+} // namespace
+
 void RegisterCharacterSprites(flecs::world &world) {
-  world.observer<SpriteSet, AnimationController>("Load Character Sprites")
+  world.observer<SpriteSet, AnimationController>("Load Character Sprites Observer")
       .event(flecs::OnSet)
       .each([](SpriteSet &spriteSet, AnimationController &controller) {
         if (spriteSet.loaded) {
@@ -134,14 +138,14 @@ void RegisterCharacterSprites(flecs::world &world) {
           return;
         }
 
-        const auto desired = BuildAnimationKey(info.state, info.direction);
+        const auto desired = CharacterInternal::BuildAnimationKey(info.state, info.direction);
         if (spriteSet.FindEntry(desired)) {
           controller.PlayAnimation(desired);
           return;
         }
 
         if (info.state != CharacterState::Idle) {
-          const auto fallback = BuildAnimationKey(CharacterState::Idle, info.direction);
+          const auto fallback = CharacterInternal::BuildAnimationKey(CharacterState::Idle, info.direction);
           if (spriteSet.FindEntry(fallback)) {
             controller.PlayAnimation(fallback);
           }

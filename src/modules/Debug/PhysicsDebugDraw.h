@@ -3,5 +3,7 @@
 #include "flecs.h"
 
 namespace PhysicsDebugDraw {
-void Import(flecs::world &world);
+
+b2DebugDraw CreateDebugDraw();
+
 }

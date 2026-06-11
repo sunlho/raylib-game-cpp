@@ -5,7 +5,8 @@
 #include "CharacterInternal.h"
 
 namespace Character {
-namespace {
+namespace CharacterInternal {
+
 const char *DirectionSuffix(CharacterDirection direction) {
   switch (direction) {
   case CharacterDirection::Up:
@@ -37,7 +38,6 @@ const char *StatePrefix(CharacterState state) {
 
   return "idle";
 }
-} // namespace
 
 std::string BuildAnimationKey(CharacterState state, CharacterDirection direction) {
   std::string key;
@@ -71,6 +71,8 @@ float RandomDelaySeconds(float minDelay, float maxDelay) {
   const int delayMs = GetRandomValue(minMs, maxMs);
   return static_cast<float>(delayMs) / 1000.0f;
 }
+
+} // namespace CharacterInternal
 
 void AnimationController::AddAnimation(AnimationClip clip) {
   if (clip.frameCount < 1) {

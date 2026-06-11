@@ -4,6 +4,7 @@
 #include "raylib.h"
 
 namespace GameCamera {
+
 struct Phases {
   struct Begin2D {};
   struct End2D {};
@@ -24,6 +25,8 @@ struct CameraState {
   bool snapTargetToPixel = true;
 };
 
-void Import(flecs::world &world);
+struct module {
+  module(flecs::world &world);
+};
 
 } // namespace GameCamera

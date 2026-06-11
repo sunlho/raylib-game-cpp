@@ -16,6 +16,8 @@ typedef struct PhysicsBody {
 
 extern b2WorldId Id;
 
-void Import(flecs::world &world);
-void CreateBox2DWorld(flecs::world &world, float step);
+struct module {
+  module(flecs::world &world);
+};
+
 } // namespace Physics

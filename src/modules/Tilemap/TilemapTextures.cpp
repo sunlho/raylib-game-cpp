@@ -6,8 +6,8 @@
 #include "modules/Assets.h"
 
 namespace Tilemap {
-
 namespace TilemapInternal {
+
 Rectangle ComputeSourceRect(const TilemapTileset &tileset, std::uint32_t gid) {
   const std::uint32_t localId = gid - tileset.firstGid;
 

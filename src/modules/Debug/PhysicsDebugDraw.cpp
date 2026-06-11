@@ -11,6 +11,7 @@
 #include "modules/Reflection.h"
 #include "modules/Rendering.h"
 
+namespace PhysicsDebugDraw {
 namespace {
 
 Color ToRaylibColor(b2HexColor color) {
@@ -150,6 +151,8 @@ void DrawDebugSolidPolygon(b2Transform transform, const b2Vec2 *vertices, int ve
   DrawPolygonOutline(worldVertices.data(), vertexCount, color, nullptr);
 }
 
+} // namespace
+
 b2DebugDraw CreateDebugDraw() {
   b2DebugDraw draw = b2DefaultDebugDraw();
   draw.DrawPolygonFcn = DrawPolygonOutline;
@@ -176,26 +179,4 @@ b2DebugDraw CreateDebugDraw() {
   return draw;
 }
 
-#if !defined(NDEBUG)
-void DrawPhysicsDebugWorld(flecs::iter &it) {
-  auto world = it.world();
-  auto debugDraw = world.get<b2DebugDraw>();
-  b2World_Draw(Physics::Id, &debugDraw);
-}
-#endif
-
-} // namespace
-
-void PhysicsDebugDraw::Import(flecs::world &world) {
-#if !defined(NDEBUG)
-  world.component<b2DebugDraw>()
-      .add(flecs::Singleton);
-  world.set<b2DebugDraw>(CreateDebugDraw());
-
-  world.system("Draw Physics Debug World")
-      .kind<Rendering::Phases::Draw>()
-      .run(DrawPhysicsDebugWorld);
-#else
-  (void)world;
-#endif
-}
+} // namespace PhysicsDebugDraw

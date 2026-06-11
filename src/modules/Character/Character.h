@@ -8,6 +8,7 @@
 #include "raylib.h"
 
 namespace Character {
+
 struct Phases {
   struct Update {};
 };
@@ -101,6 +102,8 @@ struct SpriteSet {
 struct PlayerTag {};
 struct NPCTag {};
 
-void Import(flecs::world &world);
+struct module {
+  module(flecs::world &world);
+};
 
 } // namespace Character

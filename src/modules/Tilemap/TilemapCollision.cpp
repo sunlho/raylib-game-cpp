@@ -9,7 +9,6 @@
 #include "modules/Physics.h"
 
 namespace Tilemap {
-
 namespace {
 
 std::vector<b2Vec2> BuildRelativePoints(const std::vector<Vector2> &points, const Vector2 &origin) {

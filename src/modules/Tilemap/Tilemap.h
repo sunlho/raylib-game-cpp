@@ -12,6 +12,7 @@
 #include "modules/Rendering.h"
 
 namespace Tilemap {
+
 static constexpr int CHUNK_SIZE = 16;
 
 struct MapBounds {

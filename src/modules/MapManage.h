@@ -15,7 +15,10 @@ struct MapState {
   std::string currentPath;
 };
 
-void Import(flecs::world &world);
 void SetMapPath(flecs::world &world, const std::string &path);
+
+struct module {
+  module(flecs::world &world);
+};
 
 } // namespace MapManage

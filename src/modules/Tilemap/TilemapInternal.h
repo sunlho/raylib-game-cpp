@@ -13,7 +13,6 @@
 #include "Tilemap.h"
 
 namespace Tilemap {
-
 namespace TilemapInternal {
 
 constexpr std::uint32_t TMX_FLIP_BITS_REMOVAL = 0x1FFFFFFFU;
@@ -28,5 +27,4 @@ void BuildLayerChunks(const tmx::Map &tilemap, const tmx::TileLayer &layer, int 
 void BuildObjectChunks(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGroup, int layerIndex, Tilemap::LoadedMap &loadedMap);
 
 } // namespace TilemapInternal
-
 } // namespace Tilemap

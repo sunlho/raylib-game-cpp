@@ -14,7 +14,9 @@
 #include "Tilemap/Tilemap.h"
 #include "raymath.h"
 
+namespace Movement {
 namespace {
+
 float ClampAxisToBounds(float value, float halfExtent, float mapExtent) {
   if (mapExtent <= 0.0f) {
     return value;
@@ -48,10 +50,10 @@ Vector2 GetSpriteHalfExtents(const Character::SpriteSet &spriteSet, const Charac
       static_cast<float>(entry->animation.width) * spriteSet.scale * 0.5f,
       static_cast<float>(entry->animation.height) * spriteSet.scale * 0.5f};
 }
+
 } // namespace
 
-void Movement::Import(flecs::world &world) {
-
+module::module(flecs::world &world) {
   Reflection::Register<Velocity>(world);
   Reflection::Register<MoveSpeed>(world);
 
@@ -72,6 +74,7 @@ void Movement::Import(flecs::world &world) {
         velocity.value = Vector2Scale(direction, speed.value);
       });
 
+  // TODO: The physics position is not clamped to the map bounds
   world.system<Rendering::Position, const Velocity, const Physics::PhysicsBody>("Move Entities")
       .kind<Simulation::FixedUpdate>()
       .each([](flecs::iter &it, size_t i, Rendering::Position &position, const Velocity &velocity, const Physics::PhysicsBody &physicsBody) {
@@ -130,3 +133,5 @@ void Movement::Import(flecs::world &world) {
         }
       });
 }
+
+} // namespace Movement

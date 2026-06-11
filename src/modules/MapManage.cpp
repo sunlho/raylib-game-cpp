@@ -12,6 +12,7 @@
 #include "modules/Rendering.h"
 #include "modules/Tilemap/Tilemap.h"
 
+namespace MapManage {
 namespace {
 
 class ChunkRenderable final : public Rendering::Renderable {
@@ -171,7 +172,7 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
   DestroyCurrentMap(mapState);
   ClearMapData(world);
 
-  mapState.mapRoot = world.entity("map_root");
+  mapState.mapRoot = world.entity("map root");
   mapState.currentPath = mapPath.value;
 
   auto &mapBounds = world.get_mut<Tilemap::MapBounds>();
@@ -208,7 +209,7 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
 
 } // namespace
 
-void MapManage::Import(flecs::world &world) {
+module::module(flecs::world &world) {
   Reflection::Register<Tilemap::MapBounds>(world);
   Reflection::Register<Tilemap::CollisionData>(world);
   Reflection::Register<MapPath>(world);
@@ -232,15 +233,15 @@ void MapManage::Import(flecs::world &world) {
       .add(flecs::Singleton);
   world.set<MapCacheState>({});
 
-  world.system<const MapPath>("Load Map")
-      .kind(flecs::OnStart)
+  world.observer<const MapPath>("Load Map Observer")
+      .event(flecs::OnSet)
       .each([](flecs::entity entity, const MapPath &mapPath) {
         auto world = entity.world();
         LoadMapFromPath(world, mapPath);
       });
 }
 
-void MapManage::SetMapPath(flecs::world &world, const std::string &path) {
+void SetMapPath(flecs::world &world, const std::string &path) {
   auto mapEntity = world.entity("map");
   mapEntity.set<MapPath>(MapPath{path});
 
@@ -248,3 +249,5 @@ void MapManage::SetMapPath(flecs::world &world, const std::string &path) {
     LoadMapFromPath(world, MapPath{path});
   }
 }
+
+} // namespace MapManage

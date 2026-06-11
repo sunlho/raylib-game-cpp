@@ -7,7 +7,9 @@
 #include "Rendering.h"
 #include "Simulation.h"
 
+namespace Rendering {
 namespace {
+
 void DrawScaledRenderTarget(const RenderTexture2D &renderTarget, const Vector2 &targetSize) {
   const int screenWidth = GetScreenWidth();
   const int screenHeight = GetScreenHeight();
@@ -63,17 +65,16 @@ bool EnsureRenderTarget(RenderTexture2D &renderTarget, const Vector2 &size) {
 
   return true;
 }
+
 } // namespace
 
-void Rendering::Import(flecs::world &world) {
-
+module::module(flecs::world &world) {
   Reflection::Register<Position>(world);
+  Reflection::Register<Rectangle>(world);
   Reflection::Register<RenderComponent>(world);
-  Reflection::Register<WindowTitle>(world);
-  Reflection::Register<WindowSize>(world);
   Reflection::Register<RenderTargetSize>(world);
   Reflection::Register<RenderTargetState>(world);
-  Reflection::Register<WindowFPS>(world);
+  Reflection::Register<RenderTexture2D>(world);
 
   world.system("BeginDrawing")
       .kind<Phases::PreDraw>()
@@ -118,3 +119,5 @@ void Rendering::Import(flecs::world &world) {
         EndDrawing();
       });
 }
+
+} // namespace Rendering
