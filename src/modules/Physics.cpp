@@ -36,7 +36,7 @@ module::module(flecs::world &world) {
   world.system<const PhysicsWorld>("Fixed Update")
       .kind<Simulation::FixedUpdate>()
       .each([](flecs::iter &it, size_t i, const PhysicsWorld &world) {
-        b2World_Step(world.id, world.timeStep, 4);
+        b2World_Step(world.id, world.timeStep, 1);
       });
 
   world.observer<b2BodyId>("Destroy Body Observer")

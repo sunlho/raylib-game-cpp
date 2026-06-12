@@ -35,6 +35,8 @@ int main() {
   InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "raylib game cpp");
   SetTargetFPS(60);
 
+  b2SetLengthUnitsPerMeter(48.0f);
+
   flecs::world world;
   world.set<flecs::Rest>({});
   world.import<flecs::stats>();

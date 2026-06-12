@@ -1,4 +1,5 @@
 #pragma once
+#include <iostream>
 #include <vcruntime_typeinfo.h>
 #include <vector>
 
@@ -32,8 +33,11 @@ struct is_std_vector<std::vector<T>> {
 // Reusable reflection support for std::vector
 template <typename Elem, typename Vector = std::vector<Elem>>
 flecs::opaque<Vector, Elem> std_vector_support(flecs::world &world) {
+  flecs::entity type = world.scope("VectorType").vector<Elem>();
+  std::string name = std::string("opaque<vector<") + typeid(Elem).name() + ">>";
+  type.set_name(name.c_str());
   return flecs::opaque<Vector, Elem>()
-      .as_type(world.vector<Elem>())
+      .as_type(type)
       // Forward elements of std::vector value to serializer
       .serialize([](const flecs::serializer *s, const Vector *data) {
         for (const auto &el : *data) {
@@ -60,50 +64,50 @@ flecs::opaque<Vector, Elem> std_vector_support(flecs::world &world) {
 }
 
 template <typename T>
-void GenerateImplicitReflectionBinds(flecs::world &World) {
-  flecs::untyped_component Cmp = World.component<T>();
-  if (Cmp.has<flecs::Type>() || Cmp.has<EcsOpaque>()) {
+void GenerateImplicitReflectionBinds(flecs::world &world) {
+  flecs::untyped_component cmp = world.component<T>();
+  if (cmp.has<flecs::Type>() || cmp.has<EcsOpaque>()) {
     return;
   }
 
   if constexpr (is_std_vector<T>::value) {
-    World.component<T>()
+    world.component<T>()
         .opaque(std_vector_support<typename T::value_type>);
 
     if constexpr (std::is_aggregate_v<typename T::value_type>) {
-      GenerateImplicitReflectionBinds<typename T::value_type>(World);
+      GenerateImplicitReflectionBinds<typename T::value_type>(world);
     }
   } else {
-    const auto Names = boost::pfr::names_as_array<T>();
-    T *Dummy = nullptr;
+    const auto names = boost::pfr::names_as_array<T>();
+    T *dummy = nullptr;
 
-    boost::pfr::for_each_field(*Dummy, [&]<typename MemberType>(const MemberType &value, std::size_t i) {
-      printf("Testing %s %s\n", Names[i].data(), typeid(MemberType).name());
-      if (!World.component<MemberType>().template has<flecs::Type>() && !World.component<MemberType>().template has<EcsOpaque>()) {
+    boost::pfr::for_each_field(*dummy, [&]<typename MemberType>(const MemberType &value, std::size_t i) {
+      printf("Testing %s %s\n", names[i].data(), typeid(MemberType).name());
+      if (!world.component<MemberType>().template has<flecs::Type>() && !world.component<MemberType>().template has<EcsOpaque>()) {
         if constexpr (std::is_aggregate_v<MemberType>) {
-          GenerateImplicitReflectionBinds<MemberType>(World);
+          GenerateImplicitReflectionBinds<MemberType>(world);
         } else if constexpr (is_std_vector<MemberType>::value) {
-          World.component<MemberType>()
+          world.component<MemberType>()
               .opaque(std_vector_support<typename MemberType::value_type>);
 
           if constexpr (std::is_aggregate_v<typename MemberType::value_type>) {
-            GenerateImplicitReflectionBinds<typename MemberType::value_type>(World);
+            GenerateImplicitReflectionBinds<typename MemberType::value_type>(world);
           }
         } else if constexpr (!std::is_pointer_v<MemberType>) {
           printf("Skipping %s\n", typeid(MemberType).name());
           return;
         }
       }
-      const void *Vptr = static_cast<const void *>(&value);
-      ptrdiff_t Offset = static_cast<const uint8_t *>(Vptr) - reinterpret_cast<const uint8_t *>(Dummy);
-      Cmp.member<MemberType>(Names[i].data(), std::extent_v<MemberType>, Offset);
+      const void *vptr = static_cast<const void *>(&value);
+      ptrdiff_t offset = static_cast<const uint8_t *>(vptr) - reinterpret_cast<const uint8_t *>(dummy);
+      cmp.member<MemberType>(names[i].data(), std::extent_v<MemberType>, offset);
     });
   }
 }
 } // namespace Detail
 
 template <typename T>
-void Register(flecs::world &World) {
-  Detail::GenerateImplicitReflectionBinds<T>(World);
+void Register(flecs::world &world) {
+  Detail::GenerateImplicitReflectionBinds<T>(world);
 }
 } // namespace Reflection
