@@ -66,6 +66,13 @@ bool EnsureRenderTarget(RenderTexture2D &renderTarget, const Vector2 &size) {
   return true;
 }
 
+int OrderBySortY(flecs::entity_t e1, const RenderComponent *r1, flecs::entity_t e2, const RenderComponent *r2) {
+  (void)e1;
+  (void)e2;
+
+  return r1->sortY - r2->sortY;
+}
+
 } // namespace
 
 module::module(flecs::world &world) {
@@ -75,6 +82,7 @@ module::module(flecs::world &world) {
   Reflection::Register<RenderTargetSize>(world);
   Reflection::Register<RenderTargetState>(world);
   Reflection::Register<RenderTexture2D>(world);
+  world.component<RenderSortTag>();
 
   world.system("BeginDrawing")
       .kind<Phases::PreDraw>()
@@ -94,7 +102,20 @@ module::module(flecs::world &world) {
       });
 
   world.system<const Position, const RenderComponent>("Draw Renderables")
+      .without<RenderSortTag>()
       .kind<Phases::Draw>()
+      .each([](const Position &p, const RenderComponent &renderable) {
+        if (!renderable.visible || !renderable.object) {
+          return;
+        }
+
+        renderable.object->Draw(p);
+      });
+
+  world.system<const Position, const RenderComponent>("Draw Sorted Renderables")
+      .with<RenderSortTag>()
+      .kind<Phases::Draw>()
+      .order_by<const RenderComponent>(OrderBySortY)
       .each([](const Position &p, const RenderComponent &renderable) {
         if (!renderable.visible || !renderable.object) {
           return;

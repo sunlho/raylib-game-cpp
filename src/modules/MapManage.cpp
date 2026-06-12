@@ -140,6 +140,7 @@ void CreateChunkEntity(flecs::world &world, const Tilemap::Chunk &chunk, const s
   Rendering::RenderComponent renderComponent;
   renderComponent.object = renderable;
   renderComponent.visible = true;
+  renderComponent.sortY = Rendering::getSortYByLayer(chunk.layerIndex, static_cast<int>(chunkRect.y + chunkHeight));
 
   Rendering::Position position;
   position.value = Vector2{
@@ -151,6 +152,9 @@ void CreateChunkEntity(flecs::world &world, const Tilemap::Chunk &chunk, const s
       .set<Tilemap::Chunk>(chunk)
       .set<Rendering::Position>(position)
       .set<Rendering::RenderComponent>(renderComponent);
+  if (chunk.layerIndex == 3) {
+    chunkEntity.add<Rendering::RenderSortTag>();
+  }
 
   if (layerGroup.is_valid()) {
     chunkEntity.add(flecs::ChildOf, layerGroup);

@@ -26,8 +26,11 @@ struct Renderable {
 
 struct RenderComponent {
   std::shared_ptr<Renderable> object;
+  int sortY = 0;
   bool visible = true;
 };
+
+struct RenderSortTag {};
 
 struct CircleRenderable final : Renderable {
   Color color;
@@ -51,6 +54,10 @@ struct RenderTargetSize {
 struct RenderTargetState {
   bool active = false;
 };
+
+static inline int getSortYByLayer(int layerIndex, int posY) {
+  return layerIndex * 10000 + posY;
+}
 
 struct module {
   module(flecs::world &world);
