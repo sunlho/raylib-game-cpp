@@ -102,6 +102,8 @@ struct SpriteSet {
 struct PlayerTag {};
 struct NPCTag {};
 
+Vector2 GetSpriteHalfExtents(const SpriteSet &spriteSet, const AnimationController &controller);
+
 struct module {
   module(flecs::world &world);
 };

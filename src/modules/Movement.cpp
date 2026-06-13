@@ -31,26 +31,6 @@ float ClampAxisToBounds(float value, float halfExtent, float mapExtent) {
   return std::clamp(value, minValue, maxValue);
 }
 
-Vector2 GetSpriteHalfExtents(const Character::SpriteSet &spriteSet, const Character::AnimationController &controller) {
-  if (!spriteSet.loaded) {
-    return Vector2{0.0f, 0.0f};
-  }
-
-  const Character::AnimationClip *clip = controller.GetCurrentAnimation();
-  const Character::SpriteEntry *entry = clip ? spriteSet.FindEntry(clip->name) : nullptr;
-  if (!entry && !spriteSet.entries.empty()) {
-    entry = &spriteSet.entries.front();
-  }
-
-  if (!entry || entry->animation.width <= 0 || entry->animation.height <= 0) {
-    return Vector2{0.0f, 0.0f};
-  }
-
-  return Vector2{
-      static_cast<float>(entry->animation.width) * spriteSet.scale * 0.5f,
-      static_cast<float>(entry->animation.height) * spriteSet.scale * 0.5f};
-}
-
 } // namespace
 
 module::module(flecs::world &world) {
@@ -84,15 +64,17 @@ module::module(flecs::world &world) {
         position.value = Vector2{bodyPosition.x, bodyPosition.y};
       });
 
-  world.system<Rendering::Position, const Character::SpriteSet, const Character::AnimationController>("Clamp Player To Map Bounds")
+  world.system<Rendering::Position, const Character::SpriteSet, const Character::AnimationController, Rendering::RenderComponent>("Clamp Player To Map Bounds")
       .kind<Simulation::FixedUpdate>()
       .with<PlayerControlled>()
-      .each([](flecs::iter &it, size_t, Rendering::Position &position, const Character::SpriteSet &spriteSet, const Character::AnimationController &controller) {
+      .each([](flecs::iter &it, size_t, Rendering::Position &position, const Character::SpriteSet &spriteSet, const Character::AnimationController &controller, Rendering::RenderComponent &renderComponent) {
         const auto &mapBounds = it.world().get<Tilemap::MapBounds>();
-        const Vector2 halfExtents = GetSpriteHalfExtents(spriteSet, controller);
+        const Vector2 halfExtents = Character::GetSpriteHalfExtents(spriteSet, controller);
 
         position.value.x = ClampAxisToBounds(position.value.x, halfExtents.x, mapBounds.dimension.x);
         position.value.y = ClampAxisToBounds(position.value.y, halfExtents.y, mapBounds.dimension.y);
+
+        renderComponent.sortY = Rendering::GetSortYByLayer(3, static_cast<int>(position.value.y + halfExtents.y));
       });
 
   world.system<const Rendering::Position>("Follow Camera Target")
@@ -102,10 +84,8 @@ module::module(flecs::world &world) {
         auto world = it.world();
         auto mainCamera = world.singleton<GameCamera::MainCamera>();
         auto &cameraState = mainCamera.get_mut<GameCamera::CameraState>();
-        auto mapBoundsEntity = world.singleton<Tilemap::MapBounds>();
-        const auto &mapBounds = mapBoundsEntity.get<Tilemap::MapBounds>();
-        auto renderTargetSizeEntity = world.singleton<Rendering::RenderTargetSize>();
-        const auto &renderTargetSize = renderTargetSizeEntity.get<Rendering::RenderTargetSize>();
+        const auto mapBounds = world.get<Tilemap::MapBounds>();
+        const auto renderTargetSize = world.get<Rendering::RenderTargetSize>();
         const bool snapTargetToPixel = cameraState.snapTargetToPixel;
 
         Vector2 target = Vector2Add(position.value, cameraState.followOffset);

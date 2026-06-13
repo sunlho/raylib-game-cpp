@@ -107,7 +107,7 @@ void GenerateImplicitReflectionBinds(flecs::world &world) {
 } // namespace Detail
 
 template <typename T>
-void Register(flecs::world &world) {
+void Register(flecs::world &world, bool singleton = false) {
   Detail::GenerateImplicitReflectionBinds<T>(world);
 }
 } // namespace Reflection

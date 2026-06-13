@@ -104,24 +104,24 @@ module::module(flecs::world &world) {
   world.system<const Position, const RenderComponent>("Draw Renderables")
       .without<RenderSortTag>()
       .kind<Phases::Draw>()
-      .each([](const Position &p, const RenderComponent &renderable) {
+      .each([](flecs::entity entity, const Position &p, const RenderComponent &renderable) {
         if (!renderable.visible || !renderable.object) {
           return;
         }
 
-        renderable.object->Draw(p);
+        renderable.object->Draw(entity, p);
       });
 
   world.system<const Position, const RenderComponent>("Draw Sorted Renderables")
       .with<RenderSortTag>()
       .kind<Phases::Draw>()
       .order_by<const RenderComponent>(OrderBySortY)
-      .each([](const Position &p, const RenderComponent &renderable) {
+      .each([](flecs::entity entity, const Position &p, const RenderComponent &renderable) {
         if (!renderable.visible || !renderable.object) {
           return;
         }
 
-        renderable.object->Draw(p);
+        renderable.object->Draw(entity, p);
       });
 
   world.system("EndDraw")

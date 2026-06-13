@@ -24,6 +24,7 @@ add_executable(${PROJECT_NAME}
     src/modules/Character/CharacterAnimation.cpp
     src/modules/Character/CharacterCore.cpp
     src/modules/Character/CharacterPhysics.cpp
+    src/modules/Character/CharacterRendering.cpp
     src/modules/Character/CharacterSprites.cpp
     src/modules/Debug/PhysicsDebugDraw.cpp
 

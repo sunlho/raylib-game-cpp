@@ -17,18 +17,19 @@ namespace {
 
 class ChunkRenderable final : public Rendering::Renderable {
 public:
-  ChunkRenderable(std::vector<Tilemap::ChunkTile> tiles, std::shared_ptr<Tilemap::TilemapTextureBank> textureBank)
-      : tiles_(std::move(tiles)), textureBank_(std::move(textureBank)) {
+  ChunkRenderable(std::shared_ptr<Tilemap::TilemapTextureBank> textureBank)
+      : textureBank_(std::move(textureBank)) {
   }
 
-  void Draw(const Rendering::Position &position) const override {
+  void Draw(flecs::entity entity, const Rendering::Position &position) const override {
+    auto chunk = entity.get<Tilemap::Chunk>();
     (void)position;
 
     if (!textureBank_) {
       return;
     }
 
-    for (const auto &tile : tiles_) {
+    for (const auto &tile : chunk.tiles) {
       if (tile.textureIndex < 0 || tile.textureIndex >= static_cast<int>(textureBank_->tilesets.size())) {
         continue;
       }
@@ -49,7 +50,6 @@ public:
   }
 
 private:
-  std::vector<Tilemap::ChunkTile> tiles_;
   std::shared_ptr<Tilemap::TilemapTextureBank> textureBank_;
 };
 
@@ -135,12 +135,12 @@ void CreateChunkEntity(flecs::world &world, const Tilemap::Chunk &chunk, const s
   const float chunkWidth = chunkRect.width;
   const float chunkHeight = chunkRect.height;
 
-  auto renderable = std::make_shared<ChunkRenderable>(chunk.tiles, textureBank);
+  auto renderable = std::make_shared<ChunkRenderable>(textureBank);
 
   Rendering::RenderComponent renderComponent;
   renderComponent.object = renderable;
   renderComponent.visible = true;
-  renderComponent.sortY = Rendering::getSortYByLayer(chunk.layerIndex, static_cast<int>(chunkRect.y + chunkHeight));
+  renderComponent.sortY = Rendering::GetSortYByLayer(chunk.layerIndex, static_cast<int>(chunkRect.y + chunkHeight));
 
   Rendering::Position position;
   position.value = Vector2{

@@ -81,6 +81,26 @@ bool LoadWebPAnimation(std::string_view path, SpriteAnimation &animation, int &o
 
 } // namespace
 
+Vector2 GetSpriteHalfExtents(const SpriteSet &spriteSet, const AnimationController &controller) {
+  if (!spriteSet.loaded) {
+    return Vector2{0.0f, 0.0f};
+  }
+
+  const AnimationClip *clip = controller.GetCurrentAnimation();
+  const SpriteEntry *entry = clip ? spriteSet.FindEntry(clip->name) : nullptr;
+  if (!entry && !spriteSet.entries.empty()) {
+    entry = &spriteSet.entries.front();
+  }
+
+  if (!entry || entry->animation.width <= 0 || entry->animation.height <= 0) {
+    return Vector2{0.0f, 0.0f};
+  }
+
+  return Vector2{
+      static_cast<float>(entry->animation.width) * spriteSet.scale * 0.5f,
+      static_cast<float>(entry->animation.height) * spriteSet.scale * 0.5f};
+}
+
 void RegisterCharacterSprites(flecs::world &world) {
   world.observer<SpriteSet, AnimationController>("Load Character Sprites Observer")
       .event(flecs::OnSet)
@@ -152,61 +172,6 @@ void RegisterCharacterSprites(flecs::world &world) {
         }
       });
 
-  world.system<const Rendering::Position, SpriteSet, const AnimationController>("Draw Character Sprites")
-      .kind<Rendering::Phases::Draw>()
-      .each([](const Rendering::Position &position, SpriteSet &spriteSet, const AnimationController &controller) {
-        if (!spriteSet.loaded) {
-          return;
-        }
-
-        const auto *clip = controller.GetCurrentAnimation();
-        if (!clip) {
-          return;
-        }
-
-        auto *entry = spriteSet.FindEntry(clip->name);
-        if (!entry) {
-          return;
-        }
-
-        auto &animation = entry->animation;
-        if (animation.texture.id == 0 || animation.frameCount <= 0) {
-          return;
-        }
-
-        int frame = controller.currentFrame;
-        if (frame < 0) {
-          frame = 0;
-        }
-        if (frame >= animation.frameCount) {
-          frame = animation.frameCount - 1;
-        }
-
-        if (animation.bytesPerFrame > 0 &&
-            frame != animation.lastFrame &&
-            static_cast<std::size_t>(animation.bytesPerFrame) * (static_cast<std::size_t>(frame) + 1) <= animation.pixels.size()) {
-          UpdateTexture(animation.texture, animation.pixels.data() + static_cast<std::size_t>(animation.bytesPerFrame) * frame);
-
-          animation.lastFrame = frame;
-        }
-
-        Rectangle src = {
-            0.0f,
-            0.0f,
-            static_cast<float>(animation.width),
-            static_cast<float>(animation.height)};
-        Rectangle dest = {
-            position.value.x,
-            position.value.y,
-            static_cast<float>(animation.width) * spriteSet.scale,
-            static_cast<float>(animation.height) * spriteSet.scale};
-        dest.x = roundf(dest.x);
-        dest.y = roundf(dest.y);
-        Vector2 origin = spriteSet.useCenterOrigin ? Vector2{roundf(dest.width * 0.5f), roundf(dest.height * 0.5f)} : spriteSet.origin;
-
-        DrawTexturePro(animation.texture, src, dest, origin, 0.0f, WHITE);
-      });
-
   world.system<SpriteSet>("Unload Character Sprites")
       .kind(flecs::OnRemove)
       .each([](SpriteSet &spriteSet) {
@@ -222,4 +187,5 @@ void RegisterCharacterSprites(flecs::world &world) {
         spriteSet.loaded = false;
       });
 }
+
 } // namespace Character

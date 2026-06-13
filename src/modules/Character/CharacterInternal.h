@@ -19,5 +19,6 @@ float RandomDelaySeconds(float minDelay, float maxDelay);
 void RegisterCharacterAnimation(flecs::world &world);
 void RegisterCharacterSprites(flecs::world &world);
 void RegisterCharacterPhysics(flecs::world &world);
+void RegisterCharacterRendering(flecs::world &world);
 
 } // namespace Character

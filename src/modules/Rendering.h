@@ -21,7 +21,7 @@ struct Position {
 
 struct Renderable {
   virtual ~Renderable() = default;
-  virtual void Draw(const Position &position) const = 0;
+  virtual void Draw(flecs::entity entity, const Position &position) const = 0;
 };
 
 struct RenderComponent {
@@ -31,19 +31,6 @@ struct RenderComponent {
 };
 
 struct RenderSortTag {};
-
-struct CircleRenderable final : Renderable {
-  Color color;
-  float radius;
-
-  CircleRenderable(Color color, float radius)
-      : color(color), radius(radius) {
-  }
-
-  void Draw(const Position &position) const override {
-    DrawCircleV(position.value, radius, color);
-  }
-};
 
 struct MainWindow {};
 
@@ -55,7 +42,7 @@ struct RenderTargetState {
   bool active = false;
 };
 
-static inline int getSortYByLayer(int layerIndex, int posY) {
+static inline int GetSortYByLayer(int layerIndex, int posY) {
   return layerIndex * 10000 + posY;
 }
 

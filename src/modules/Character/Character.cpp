@@ -21,6 +21,7 @@ module::module(flecs::world &world) {
   RegisterCharacterAnimation(world);
   RegisterCharacterSprites(world);
   RegisterCharacterPhysics(world);
+  RegisterCharacterRendering(world);
 }
 
 } // namespace Character
