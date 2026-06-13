@@ -1,3 +1,5 @@
+#include <memory.h>
+
 #include "box2d/box2d.h"
 
 #include "Debug/PhysicsDebugDraw.h"
@@ -11,6 +13,7 @@ namespace {
 
 bool disableDebugDraw = true;
 flecs::system drawDebugSystem;
+static std::unique_ptr<b2DebugDraw> debugDraw;
 
 } // namespace
 
@@ -44,29 +47,15 @@ module::module(flecs::world &world) {
       .each([](flecs::entity, const b2BodyId &bodyId) {
         b2DestroyBody(bodyId);
       });
-
-#if !defined(NDEBUG)
-  world.component<b2DebugDraw>()
-      .add(flecs::Singleton);
-  world.set<b2DebugDraw>(PhysicsDebugDraw::CreateDebugDraw());
-
-  drawDebugSystem = world.system("Draw Physics Debug World").kind<Rendering::Phases::Draw>().run([](flecs::iter &it) {
-    auto world = it.world();
-    auto debugDraw = world.get<b2DebugDraw>();
-    b2World_Draw(Physics::Id, &debugDraw);
-  });
-  drawDebugSystem.disable();
-#endif
 }
 
-void changeDebugDrawSystemEnabled() {
+void DebugDraw() {
 #if !defined(NDEBUG)
-  if (disableDebugDraw) {
-    drawDebugSystem.enable();
-  } else {
-    drawDebugSystem.disable();
+  if (!debugDraw) {
+    debugDraw = std::make_unique<b2DebugDraw>(PhysicsDebugDraw::CreateDebugDraw());
   }
-  disableDebugDraw = !disableDebugDraw;
+
+  b2World_Draw(Physics::Id, debugDraw.get());
 #endif
 }
 

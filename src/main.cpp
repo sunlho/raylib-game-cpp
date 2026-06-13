@@ -8,6 +8,7 @@
 
 #include "modules/Camera.h"
 #include "modules/Character/Character.h"
+#include "modules/Debug/DebugDraw.h"
 #include "modules/Debug/PhysicsDebugDraw.h"
 #include "modules/MapManage.h"
 #include "modules/Movement.h"
@@ -28,7 +29,7 @@ constexpr int SCREEN_HEIGHT = 720;
 constexpr int BASE_WIDTH = 640;
 constexpr int BASE_HEIGHT = 360;
 
-struct DebugTag {};
+static bool isDebugDrawEnabled = false;
 
 int main() {
 
@@ -119,7 +120,7 @@ int main() {
 
   while (!WindowShouldClose()) {
     if (IsKeyPressed(KEY_F1)) {
-      Physics::changeDebugDrawSystemEnabled();
+      isDebugDrawEnabled = !isDebugDrawEnabled;
     }
 
     if (IsKeyPressed(KEY_PAGE_UP)) {
@@ -145,6 +146,12 @@ int main() {
     ecs_run_pipeline(world, background, GetFrameTime());
     ecs_run_pipeline(world, begin2D, GetFrameTime());
     ecs_run_pipeline(world, draw, GetFrameTime());
+
+    if (isDebugDrawEnabled) {
+      Physics::DebugDraw();
+      DebugDraw::ProcessDrawQueue();
+    }
+
     ecs_run_pipeline(world, end2D, GetFrameTime());
     ecs_run_pipeline(world, postDraw, GetFrameTime());
 

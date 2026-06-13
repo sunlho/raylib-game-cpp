@@ -1,19 +1,22 @@
-#include "MapManage.h"
-
 #include <cstddef>
+#include <format>
 #include <list>
 #include <memory>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
+#include "MapManage.h"
 #include "Physics.h"
+#include "modules/Debug/DebugDraw.h"
 #include "modules/Reflection.h"
 #include "modules/Rendering.h"
 #include "modules/Tilemap/Tilemap.h"
 
 namespace MapManage {
 namespace {
+
+bool disableDebugDraw = false;
 
 class ChunkRenderable final : public Rendering::Renderable {
 public:
@@ -46,6 +49,18 @@ public:
           Vector2{0.0f, 0.0f},
           0.0f,
           WHITE);
+    }
+
+    if (!disableDebugDraw) {
+      DebugDraw::EnqueueDraw({.type = DebugDraw::DrawType::RectangleLines,
+                              .rect = chunk.destRect,
+                              .color = RED});
+      const auto info = std::format("Chunk ({}, {}) - Index: {} - Tiles: {}", chunk.chunkX, chunk.chunkY, chunk.layerIndex, chunk.tiles.size());
+
+      DebugDraw::EnqueueDraw({.type = DebugDraw::DrawType::Text,
+                              .pos = Vector2{chunk.destRect.x, chunk.destRect.y + chunk.layerIndex * 10},
+                              .text = info,
+                              .color = YELLOW});
     }
   }
 

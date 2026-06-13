@@ -26,12 +26,14 @@ add_executable(${PROJECT_NAME}
     src/modules/Character/CharacterPhysics.cpp
     src/modules/Character/CharacterRendering.cpp
     src/modules/Character/CharacterSprites.cpp
-    src/modules/Debug/PhysicsDebugDraw.cpp
 
     src/modules/Tilemap/Tilemap.cpp
     src/modules/Tilemap/TilemapChunks.cpp
     src/modules/Tilemap/TilemapCollision.cpp
     src/modules/Tilemap/TilemapTextures.cpp
+
+    src/modules/Debug/DebugDraw.cpp
+    src/modules/Debug/PhysicsDebugDraw.cpp
 )
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 

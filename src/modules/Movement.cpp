@@ -3,6 +3,8 @@
 #include <iostream>
 
 #include "box2d/box2d.h"
+#include "raylib.h"
+#include "raymath.h"
 
 #include "Camera.h"
 #include "Character/Character.h"
@@ -12,7 +14,6 @@
 #include "Rendering.h"
 #include "Simulation.h"
 #include "Tilemap/Tilemap.h"
-#include "raymath.h"
 
 namespace Movement {
 namespace {

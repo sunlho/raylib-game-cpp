@@ -20,6 +20,6 @@ struct module {
   module(flecs::world &world);
 };
 
-void changeDebugDrawSystemEnabled();
+void DebugDraw();
 
 } // namespace Physics
