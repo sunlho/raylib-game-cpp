@@ -45,10 +45,10 @@ int main() {
 
   world.import<Rendering::module>();
   world.import<GameCamera::module>();
+  world.import<Physics::module>();
   world.import<Movement::module>();
   world.import<Character::module>();
   world.import<MapManage::module>();
-  world.import<Physics::module>();
 
   const auto preDraw = buildPipeline<Rendering::Phases::PreDraw>(world);
   const auto background = buildPipeline<Rendering::Phases::Background>(world);

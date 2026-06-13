@@ -7,9 +7,14 @@
 namespace Character {
 
 void RegisterCharacterPhysics(flecs::world &world) {
-  world.observer<CharacterInfo, SpriteSet, Rendering::Position, Physics::PhysicsBody>("Create Character Physics Observer")
+  world.observer<Physics::PhysicsBody, Rendering::Position>("Create Character Physics Observer")
+      .with<PlayerTag>()
       .event(flecs::OnSet)
-      .each([](CharacterInfo &info, SpriteSet &spriteSet, Rendering::Position &position, Physics::PhysicsBody &physicsBody) {
+      .each([](Physics::PhysicsBody &physicsBody, Rendering::Position &position) {
+        if (b2Body_IsValid(physicsBody.id)) {
+          b2Body_SetTransform(physicsBody.id, b2Vec2{position.value.x, position.value.y}, b2Rot{1.0f, 0.0f});
+          return;
+        }
         b2BodyDef bodyDef = b2DefaultBodyDef();
         bodyDef.type = b2_dynamicBody;
         bodyDef.position = b2Vec2{position.value.x, position.value.y};

@@ -16,7 +16,7 @@
 namespace MapManage {
 namespace {
 
-bool disableDebugDraw = false;
+bool disableDebugDraw = true;
 
 class ChunkRenderable final : public Rendering::Renderable {
 public:
@@ -25,6 +25,11 @@ public:
   }
 
   void Draw(flecs::entity entity, const Rendering::Position &position) const override {
+    const auto parent = entity.parent();
+    const auto visibility = parent.get<Rendering::RenderVisibility>();
+    if (!visibility.visible) {
+      return;
+    }
     auto chunk = entity.get<Tilemap::Chunk>();
     (void)position;
 
@@ -212,6 +217,8 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
       if (mapState.mapRoot.is_valid()) {
         groupIt->second.add(flecs::ChildOf, mapState.mapRoot);
       }
+
+      groupIt->second.add<Rendering::RenderVisibility>();
     }
 
     for (const auto &chunkTile : chunk.tiles) {

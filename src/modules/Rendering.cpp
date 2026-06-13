@@ -79,6 +79,7 @@ module::module(flecs::world &world) {
   Reflection::Register<Position>(world);
   Reflection::Register<Rectangle>(world);
   Reflection::Register<RenderComponent>(world);
+  Reflection::Register<RenderVisibility>(world);
   Reflection::Register<RenderTargetSize>(world);
   Reflection::Register<RenderTargetState>(world);
   Reflection::Register<RenderTexture2D>(world);
