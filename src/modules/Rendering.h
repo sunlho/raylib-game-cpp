@@ -28,6 +28,7 @@ struct RenderComponent {
   std::shared_ptr<Renderable> object;
   int sortY = 0;
   bool visible = true;
+  int layerIndex = 0;
 };
 
 struct RenderVisibility {

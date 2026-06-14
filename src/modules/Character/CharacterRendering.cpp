@@ -80,7 +80,8 @@ void RegisterCharacterRendering(flecs::world &world) {
 
         const Vector2 halfExtents = GetSpriteHalfExtents(spriteSet, controller);
 
-        renderComponent.sortY = Rendering::GetSortYByLayer(3, position.value.y + 15.0f);
+        renderComponent.layerIndex = 4;
+        renderComponent.sortY = Rendering::GetSortYByLayer(renderComponent.layerIndex, position.value.y + halfExtents.y);
 
         entity.add<Rendering::RenderComponent>().set(renderComponent);
         entity.add<Rendering::RenderSortTag>();

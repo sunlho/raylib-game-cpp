@@ -161,6 +161,7 @@ void CreateChunkEntity(flecs::world &world, const Tilemap::Chunk &chunk, const s
   renderComponent.object = renderable;
   renderComponent.visible = true;
   renderComponent.sortY = Rendering::GetSortYByLayer(chunk.layerIndex, static_cast<int>(chunkRect.y + chunkHeight));
+  renderComponent.layerIndex = chunk.layerIndex;
 
   Rendering::Position position;
   position.value = Vector2{

@@ -75,7 +75,7 @@ module::module(flecs::world &world) {
         position.value.x = ClampAxisToBounds(position.value.x, halfExtents.x, mapBounds.dimension.x);
         position.value.y = ClampAxisToBounds(position.value.y, halfExtents.y, mapBounds.dimension.y);
 
-        renderComponent.sortY = Rendering::GetSortYByLayer(3, static_cast<int>(position.value.y + halfExtents.y));
+        renderComponent.sortY = Rendering::GetSortYByLayer(renderComponent.layerIndex, position.value.y + halfExtents.y);
       });
 
   world.system<const Rendering::Position>("Follow Camera Target")
