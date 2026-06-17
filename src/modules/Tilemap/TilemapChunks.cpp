@@ -62,6 +62,8 @@ void BuildLayerChunks(const tmx::Map &tilemap, const tmx::TileLayer &layer, int 
 
           const auto &tileset = textureBank->tilesets[static_cast<std::size_t>(textureIndex)];
 
+          const auto tile = tileset.getTile(gid);
+
           Tilemap::ChunkTile chunkTile;
           chunkTile.tileGid = gid;
           chunkTile.textureIndex = textureIndex;
@@ -71,6 +73,14 @@ void BuildLayerChunks(const tmx::Map &tilemap, const tmx::TileLayer &layer, int 
               static_cast<float>(tileY * tileHeight),
               static_cast<float>(tileWidth),
               static_cast<float>(tileHeight)};
+
+          const auto &properties = tile->properties;
+          for (const auto &prop : properties) {
+            if (prop.getName() == "needsYSort" && prop.getType() == tmx::Property::Type::Boolean) {
+              chunkTile.needsYSort = prop.getBoolValue();
+              break;
+            }
+          }
 
           chunk.tiles.push_back(chunkTile);
         }
@@ -136,8 +146,16 @@ void BuildObjectChunks(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGr
     tile.textureIndex = textureIndex;
     tile.srcRect = ComputeSourceRect(tileset, gid);
     tile.destRect = chunk.destRect;
-    chunk.tiles.push_back(tile);
 
+    const auto &properties = object.getProperties();
+    for (const auto &prop : properties) {
+      if (prop.getName() == "needsYSort" && prop.getType() == tmx::Property::Type::Boolean) {
+        tile.needsYSort = prop.getBoolValue();
+        break;
+      }
+    }
+
+    chunk.tiles.push_back(tile);
     loadedMap.chunks.push_back(std::move(chunk));
   }
 }

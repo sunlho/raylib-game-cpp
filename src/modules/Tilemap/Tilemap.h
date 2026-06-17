@@ -8,6 +8,7 @@
 
 #include "box2d/box2d.h"
 #include "raylib.h"
+#include "tmxlite/ObjectGroup.hpp"
 
 #include "modules/Rendering.h"
 
@@ -24,6 +25,7 @@ struct ChunkTile {
   int textureIndex = -1;
   Rectangle srcRect = {0};
   Rectangle destRect = {0};
+  bool needsYSort = false;
 };
 
 struct ChunkAnimFrame {
@@ -75,6 +77,7 @@ struct CollisionData {
 
 struct TilemapTileObject {
   std::vector<Tilemap::CollisionData> collisions;
+  std::vector<tmx::Property> properties;
 };
 
 struct TilemapTileset {
@@ -86,6 +89,7 @@ struct TilemapTileset {
   int columnCount = 0;
   int spacing = 0;
   int margin = 0;
+
   std::unordered_map<std::uint32_t, TilemapTileObject> tiles;
 
   const TilemapTileObject *getTile(uint32_t gid) const {

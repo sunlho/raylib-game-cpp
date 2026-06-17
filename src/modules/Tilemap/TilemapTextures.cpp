@@ -87,6 +87,7 @@ std::shared_ptr<TilemapTextureBank> LoadTilesetTextures(const tmx::Map &tilemap,
 
         tileObject.collisions.push_back(std::move(collision));
       }
+      tileObject.properties = tile.properties;
 
       loaded.tiles[tileId] = std::move(tileObject);
     }

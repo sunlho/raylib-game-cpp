@@ -102,6 +102,9 @@ void ClearMapData(flecs::world &world) {
 
   auto &loadedState = world.get_mut<LoadedMapState>();
   loadedState.textureBank.reset();
+
+  auto &sortableState = world.get_mut<MapManage::SortableChunksState>();
+  sortableState.sortableTiles.clear();
 }
 
 void TouchCacheEntry(MapCacheState &cacheState, std::unordered_map<std::string, CachedMapEntry>::iterator it) {
@@ -207,6 +210,8 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
   auto &loadedState = world.get_mut<LoadedMapState>();
   loadedState.textureBank = loadedMap->textureBank;
 
+  auto &sortableState = world.get_mut<MapManage::SortableChunksState>();
+
   std::unordered_map<int, flecs::entity> layerGroups;
 
   for (const auto &chunk : loadedMap->chunks) {
@@ -230,7 +235,20 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
       }
     }
 
-    CreateChunkEntity(world, chunk, loadedState.textureBank, groupIt->second);
+    Tilemap::Chunk chunkWithoutSortableTiles = chunk;
+    chunkWithoutSortableTiles.tiles.clear();
+    for (const auto &chunkTile : chunk.tiles) {
+      if (chunkTile.needsYSort) {
+        MapManage::ChunkKey key{chunk.chunkX, chunk.chunkY, chunk.layerIndex};
+        sortableState.sortableTiles[key].push_back(chunkTile);
+      } else {
+        chunkWithoutSortableTiles.tiles.push_back(chunkTile);
+      }
+    }
+
+    if (!chunkWithoutSortableTiles.tiles.empty()) {
+      CreateChunkEntity(world, chunkWithoutSortableTiles, loadedState.textureBank, groupIt->second);
+    }
   }
 }
 
@@ -243,6 +261,7 @@ module::module(flecs::world &world) {
   Reflection::Register<LoadedMapState>(world);
   Reflection::Register<MapCacheState>(world);
   Reflection::Register<MapState>(world);
+  Reflection::Register<MapManage::SortableChunksState>(world);
 
   world.component<Tilemap::MapBounds>()
       .add(flecs::Singleton);
@@ -259,6 +278,10 @@ module::module(flecs::world &world) {
   world.component<MapCacheState>()
       .add(flecs::Singleton);
   world.set<MapCacheState>({});
+
+  world.component<MapManage::SortableChunksState>()
+      .add(flecs::Singleton);
+  world.set<MapManage::SortableChunksState>({});
 
   world.observer<const MapPath>("Load Map Observer")
       .event(flecs::OnSet)
