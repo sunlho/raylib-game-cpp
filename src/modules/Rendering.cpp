@@ -83,6 +83,11 @@ module::module(flecs::world &world) {
   Reflection::Register<RenderTargetSize>(world);
   Reflection::Register<RenderTargetState>(world);
   Reflection::Register<RenderTexture2D>(world);
+  Reflection::Register<SortableRenderQueue>(world);
+
+  world.component<SortableRenderQueue>()
+      .add(flecs::Singleton);
+  world.set<SortableRenderQueue>({});
 
   world.system("BeginDrawing")
       .kind<Phases::PreDraw>()
@@ -100,7 +105,6 @@ module::module(flecs::world &world) {
 
         ClearBackground(BLACK);
       });
-
   world.system<const Position, const RenderComponent>("Draw Renderables")
       .kind<Phases::Draw>()
       .each([](flecs::entity entity, const Position &p, const RenderComponent &renderable) {

@@ -1,7 +1,9 @@
 #pragma once
 
+#include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "flecs.h"
 #include "raylib.h"
@@ -43,6 +45,15 @@ struct RenderTargetSize {
 
 struct RenderTargetState {
   bool active = false;
+};
+
+struct SortableRenderEntry {
+  int sortY;
+  std::function<void()> draw;
+};
+
+struct SortableRenderQueue {
+  std::vector<SortableRenderEntry> entries;
 };
 
 static inline int GetSortYByLayer(int layerIndex, int posY) {

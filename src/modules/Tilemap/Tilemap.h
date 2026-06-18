@@ -50,7 +50,6 @@ struct Chunk {
   std::vector<ChunkTile> tiles;
   std::vector<ChunkAnimTile> animTiles;
 
-  RenderTexture2D texture = {0};
   bool isDirty = true;
   bool initialized = false;
 };
