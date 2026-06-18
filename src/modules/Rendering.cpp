@@ -83,7 +83,6 @@ module::module(flecs::world &world) {
   Reflection::Register<RenderTargetSize>(world);
   Reflection::Register<RenderTargetState>(world);
   Reflection::Register<RenderTexture2D>(world);
-  world.component<RenderSortTag>();
 
   world.system("BeginDrawing")
       .kind<Phases::PreDraw>()
@@ -103,20 +102,7 @@ module::module(flecs::world &world) {
       });
 
   world.system<const Position, const RenderComponent>("Draw Renderables")
-      .without<RenderSortTag>()
       .kind<Phases::Draw>()
-      .each([](flecs::entity entity, const Position &p, const RenderComponent &renderable) {
-        if (!renderable.visible || !renderable.object) {
-          return;
-        }
-
-        renderable.object->Draw(entity, p);
-      });
-
-  world.system<const Position, const RenderComponent>("Draw Sorted Renderables")
-      .with<RenderSortTag>()
-      .kind<Phases::Draw>()
-      .order_by<const RenderComponent>(OrderBySortY)
       .each([](flecs::entity entity, const Position &p, const RenderComponent &renderable) {
         if (!renderable.visible || !renderable.object) {
           return;

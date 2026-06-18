@@ -84,7 +84,6 @@ void RegisterCharacterRendering(flecs::world &world) {
         renderComponent.sortY = Rendering::GetSortYByLayer(renderComponent.layerIndex, position.value.y + halfExtents.y);
 
         entity.add<Rendering::RenderComponent>().set(renderComponent);
-        entity.add<Rendering::RenderSortTag>();
       });
 }
 

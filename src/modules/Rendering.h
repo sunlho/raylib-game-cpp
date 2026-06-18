@@ -35,8 +35,6 @@ struct RenderVisibility {
   bool visible = true;
 };
 
-struct RenderSortTag {};
-
 struct MainWindow {};
 
 struct RenderTargetSize {

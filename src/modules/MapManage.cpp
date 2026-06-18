@@ -176,9 +176,6 @@ void CreateChunkEntity(flecs::world &world, const Tilemap::Chunk &chunk, const s
       .set<Tilemap::Chunk>(chunk)
       .set<Rendering::Position>(position)
       .set<Rendering::RenderComponent>(renderComponent);
-  if (chunk.layerIndex == 3) {
-    chunkEntity.add<Rendering::RenderSortTag>();
-  }
 
   if (layerGroup.is_valid()) {
     chunkEntity.add(flecs::ChildOf, layerGroup);
@@ -227,17 +224,16 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
       groupIt->second.add<Rendering::RenderVisibility>();
     }
 
+    Tilemap::Chunk chunkWithoutSortableTiles = chunk;
+    chunkWithoutSortableTiles.tiles.clear();
+
     for (const auto &chunkTile : chunk.tiles) {
       const auto tileset = Tilemap::FindTilesetByGid(*loadedState.textureBank, chunkTile.tileGid);
       const auto tileObject = tileset->getTile(chunkTile.tileGid);
       if (tileObject && !tileObject->collisions.empty()) {
         Tilemap::CreateCollisionEntity(world, Physics::Id, tileObject->collisions, chunkTile.destRect, chunk.layerIndex, groupIt->second);
       }
-    }
 
-    Tilemap::Chunk chunkWithoutSortableTiles = chunk;
-    chunkWithoutSortableTiles.tiles.clear();
-    for (const auto &chunkTile : chunk.tiles) {
       if (chunkTile.needsYSort) {
         MapManage::ChunkKey key{chunk.chunkX, chunk.chunkY, chunk.layerIndex};
         sortableState.sortableTiles[key].push_back(chunkTile);
