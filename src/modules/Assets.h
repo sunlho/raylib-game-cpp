@@ -48,8 +48,7 @@ inline std::optional<std::vector<unsigned char>> ReadBinary(std::string_view rel
   return bytes;
 }
 
-inline std::vector<std::filesystem::path> ListFiles(std::string_view relativeDirectory = "",
-                                                    bool recursive = false) {
+inline std::vector<std::filesystem::path> ListFiles(std::string_view relativeDirectory = "", bool recursive = false) {
   std::vector<std::filesystem::path> files;
   const auto basePath = Path(relativeDirectory);
 

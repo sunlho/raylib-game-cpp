@@ -143,8 +143,8 @@ int main() {
     }
 
     ecs_run_pipeline(world, preDraw, GetFrameTime());
-    ecs_run_pipeline(world, background, GetFrameTime());
     ecs_run_pipeline(world, begin2D, GetFrameTime());
+    ecs_run_pipeline(world, background, GetFrameTime());
     ecs_run_pipeline(world, draw, GetFrameTime());
 
     if (isDebugDrawEnabled) {

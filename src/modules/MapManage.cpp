@@ -22,16 +22,15 @@ bool disableDebugDraw = true;
 struct ChunkKey {
   int x;
   int y;
-  int layer;
 
   bool operator==(const ChunkKey &other) const {
-    return x == other.x && y == other.y && layer == other.layer;
+    return x == other.x && y == other.y;
   }
 };
 
 struct ChunkKeyHash {
   std::size_t operator()(const ChunkKey &key) const {
-    return std::hash<int>()(key.x) ^ (std::hash<int>()(key.y) << 1) ^ (std::hash<int>()(key.layer) << 2);
+    return std::hash<int>()(key.x) ^ (std::hash<int>()(key.y) << 1);
   }
 };
 
@@ -159,7 +158,7 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
         Tilemap::CreateCollisionEntity(world, Physics::Id, tileObject->collisions, chunkTile.destRect, chunk.layerIndex, groupIt->second);
       }
 
-      ChunkKey key{chunk.chunkX, chunk.chunkY, chunk.layerIndex};
+      ChunkKey key{chunk.chunkX, chunk.chunkY};
       if (chunkTile.needsYSort) {
         activeData.sortableTiles[key].push_back(chunkTile);
       } else {
@@ -200,7 +199,6 @@ module::module(flecs::world &world) {
       .run([](flecs::iter &it) {
         auto world = it.world();
         const auto &activeData = world.get<ActiveMapData>();
-        const auto &renderTargetSize = world.get<Rendering::RenderTargetSize>();
 
         if (!activeData.textureBank || activeData.staticTiles.empty() || activeData.tileWidth <= 0 || activeData.tileHeight <= 0) {
           return;
@@ -211,44 +209,41 @@ module::module(flecs::world &world) {
         const int chunkPixelW = Tilemap::CHUNK_SIZE * activeData.tileWidth;
         const int chunkPixelH = Tilemap::CHUNK_SIZE * activeData.tileHeight;
 
-        Vector2 topLeft = GetScreenToWorld2D({0.0f, 0.0f}, camState.value);
-        Vector2 bottomRight = GetScreenToWorld2D({renderTargetSize.dimension.x, renderTargetSize.dimension.y}, camState.value);
+        int centerChunkX = static_cast<int>(std::floor(camState.value.target.x / chunkPixelW));
+        int centerChunkY = static_cast<int>(std::floor(camState.value.target.y / chunkPixelH));
 
-        int minChunkX = static_cast<int>(std::floor(topLeft.x / chunkPixelW));
-        int minChunkY = static_cast<int>(std::floor(topLeft.y / chunkPixelH));
-        int maxChunkX = static_cast<int>(std::floor(bottomRight.x / chunkPixelW));
-        int maxChunkY = static_cast<int>(std::floor(bottomRight.y / chunkPixelH));
+        const int tilesetCount = static_cast<int>(activeData.textureBank->tilesets.size());
 
-        for (int layerIdx = 0; layerIdx < 100; ++layerIdx) {
-          for (int chunkX = minChunkX; chunkX <= maxChunkX; ++chunkX) {
-            for (int chunkY = minChunkY; chunkY <= maxChunkY; ++chunkY) {
-              ChunkKey key{chunkX, chunkY, layerIdx};
-              auto keyIt = activeData.staticTiles.find(key);
-              if (keyIt == activeData.staticTiles.end()) {
+        for (int dx = -1; dx <= 1; ++dx) {
+          for (int dy = -1; dy <= 1; ++dy) {
+            int chunkX = centerChunkX + dx;
+            int chunkY = centerChunkY + dy;
+
+            ChunkKey key{chunkX, chunkY};
+            auto keyIt = activeData.staticTiles.find(key);
+            if (keyIt == activeData.staticTiles.end()) {
+              continue;
+            }
+
+            const auto &tiles = keyIt->second;
+
+            for (const auto &tile : tiles) {
+              if (tile.textureIndex < 0 || tile.textureIndex >= tilesetCount) {
                 continue;
               }
 
-              const auto &tiles = keyIt->second;
-              const int tilesetCount = static_cast<int>(activeData.textureBank->tilesets.size());
-
-              for (const auto &tile : tiles) {
-                if (tile.textureIndex < 0 || tile.textureIndex >= tilesetCount) {
-                  continue;
-                }
-
-                const auto &tileset = activeData.textureBank->tilesets[static_cast<std::size_t>(tile.textureIndex)];
-                if (tileset.texture.id == 0) {
-                  continue;
-                }
-
-                DrawTexturePro(
-                    tileset.texture,
-                    tile.srcRect,
-                    tile.destRect,
-                    Vector2{0.0f, 0.0f},
-                    0.0f,
-                    WHITE);
+              const auto &tileset = activeData.textureBank->tilesets[static_cast<std::size_t>(tile.textureIndex)];
+              if (tileset.texture.id == 0) {
+                continue;
               }
+
+              DrawTexturePro(
+                  tileset.texture,
+                  tile.srcRect,
+                  tile.destRect,
+                  Vector2{0.0f, 0.0f},
+                  0.0f,
+                  WHITE);
             }
           }
         }
@@ -260,14 +255,15 @@ module::module(flecs::world &world) {
         auto world = entity.world();
         LoadMapFromPath(world, mapPath);
       });
+}
 
-  void SetMapPath(flecs::world & world, const std::string &path) {
-    auto mapEntity = world.entity("Map");
-    mapEntity.set<MapPath>(MapPath{path});
+void SetMapPath(flecs::world &world, const std::string &path) {
+  auto mapEntity = world.entity("Map");
+  mapEntity.set<MapPath>(MapPath{path});
 
-    if (IsWindowReady()) {
-      LoadMapFromPath(world, MapPath{path});
-    }
+  if (IsWindowReady()) {
+    LoadMapFromPath(world, MapPath{path});
   }
+}
 
 } // namespace MapManage

@@ -105,6 +105,7 @@ module::module(flecs::world &world) {
 
         ClearBackground(BLACK);
       });
+
   world.system<const Position, const RenderComponent>("Draw Renderables")
       .kind<Phases::Draw>()
       .each([](flecs::entity entity, const Position &p, const RenderComponent &renderable) {
