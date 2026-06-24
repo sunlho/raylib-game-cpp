@@ -160,5 +160,42 @@ void BuildObjectChunks(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGr
   }
 }
 
+void BuildObjectCollisions(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGroup, int layerIndex, Tilemap::LoadedMap &loadedMap) {
+  for (const auto &object : objectGroup.getObjects()) {
+    if (!object.visible()) {
+      continue;
+    }
+
+    Tilemap::Chunk chunk;
+    chunk.chunkX = 0;
+    chunk.chunkY = 0;
+    chunk.layerIndex = layerIndex;
+    chunk.isCollision = true;
+
+    Tilemap::CollisionData collision;
+    collision.shape = static_cast<Tilemap::CollisionShape>(object.getShape());
+    auto const aabb = object.getAABB();
+    collision.AABB = Rectangle{aabb.left, aabb.top, aabb.width, aabb.height};
+    collision.position = Vector2{object.getPosition().x, object.getPosition().y};
+    collision.rotation = object.getRotation();
+
+    const auto &points = object.getPoints();
+    collision.points.reserve(points.size());
+    const auto classType = object.getClass();
+    if (classType == "Internal") {
+      for (auto it = points.rbegin(); it != points.rend(); ++it) {
+        collision.points.emplace_back(it->x, it->y);
+      }
+    } else {
+      for (const auto &point : points) {
+        collision.points.emplace_back(point.x, point.y);
+      }
+    }
+
+    chunk.collisions.push_back(collision);
+    loadedMap.chunks.push_back(std::move(chunk));
+  }
+}
+
 } // namespace TilemapInternal
 } // namespace Tilemap

@@ -18,8 +18,9 @@ void RegisterCharacterPhysics(flecs::world &world) {
         b2BodyDef bodyDef = b2DefaultBodyDef();
         bodyDef.type = b2_dynamicBody;
         bodyDef.position = b2Vec2{position.value.x, position.value.y};
+        bodyDef.fixedRotation = true;
 
-        b2Circle circle = {0.0f, 0.0f, 10.0f};
+        b2Circle circle = {0.0f, 10.0f, 10.0f};
         b2BodyId body = b2CreateBody(Physics::Id, &bodyDef);
         b2ShapeDef shapeDef = b2DefaultShapeDef();
         shapeDef.density = 1.0f;

@@ -41,19 +41,6 @@ struct ChunkAnimTile {
   std::vector<ChunkAnimFrame> frames;
 };
 
-struct Chunk {
-  int chunkX = 0;
-  int chunkY = 0;
-  Rectangle destRect = {0};
-  int layerIndex = 0;
-
-  std::vector<ChunkTile> tiles;
-  std::vector<ChunkAnimTile> animTiles;
-
-  bool isDirty = true;
-  bool initialized = false;
-};
-
 enum class CollisionShape {
   Rectangle,
   Ellipse,
@@ -72,6 +59,21 @@ struct CollisionData {
   Vector2 position = {0.0f, 0.0f};
   float rotation = 0.0f;
   int layerIndex = 0;
+};
+
+struct Chunk {
+  int chunkX = 0;
+  int chunkY = 0;
+  Rectangle destRect = {0};
+  int layerIndex = 0;
+  bool isCollision = false;
+
+  std::vector<ChunkTile> tiles;
+  std::vector<ChunkAnimTile> animTiles;
+  std::vector<CollisionData> collisions;
+
+  bool isDirty = true;
+  bool initialized = false;
 };
 
 struct TilemapTileObject {

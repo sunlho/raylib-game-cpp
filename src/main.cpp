@@ -109,7 +109,7 @@ int main() {
       .set<Character::AnimationController>({})
       .set<Character::IdleBehavior>({})
       .set<Character::SpriteSet>(playerSprites)
-      .set<Rendering::Position>({Vector2{500.0f, 500.0f}})
+      .set<Rendering::Position>({Vector2{700.0f, 700.0f}})
       .set<Physics::PhysicsBody>({b2_nullBodyId})
       .set<Movement::Velocity>({Vector2{0.0f, 0.0f}})
       .set<Movement::MoveSpeed>({85.0f});

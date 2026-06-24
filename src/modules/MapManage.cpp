@@ -139,6 +139,11 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
   layerGroups.reserve(8);
 
   for (auto &chunk : loadedMap->chunks) {
+    if (chunk.isCollision) {
+      Tilemap::CreateCollisionEntity(world, Physics::Id, chunk.collisions, chunk.destRect, chunk.layerIndex, mapState.mapRoot);
+      continue;
+    }
+
     auto [groupIt, inserted] = layerGroups.try_emplace(chunk.layerIndex);
     if (inserted) {
       const std::string layerName = "MapLayer_" + std::to_string(chunk.layerIndex);

@@ -42,7 +42,12 @@ bool LoadFromPath(const std::string &path, LoadedMap &loadedMap) {
       TilemapInternal::BuildLayerChunks(tilemap, tileLayer, layerIndex, loadedMap);
     } else if (layer->getType() == tmx::Layer::Type::Object) {
       const auto &objectGroup = layer->getLayerAs<tmx::ObjectGroup>();
-      TilemapInternal::BuildObjectChunks(tilemap, objectGroup, layerIndex, loadedMap);
+      const auto classType = objectGroup.getClass();
+      if (classType == "Collisions") {
+        TilemapInternal::BuildObjectCollisions(tilemap, objectGroup, layerIndex, loadedMap);
+      } else {
+        TilemapInternal::BuildObjectChunks(tilemap, objectGroup, layerIndex, loadedMap);
+      }
     }
 
     layerIndex++;
