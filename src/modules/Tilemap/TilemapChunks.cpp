@@ -107,9 +107,6 @@ void BuildObjectChunks(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGr
   }
 
   const auto &textureBank = loadedMap.textureBank;
-  const auto mapTileSize = tilemap.getTileSize();
-  const float mapChunkWidth = static_cast<float>(Tilemap::CHUNK_SIZE * static_cast<int>(mapTileSize.x));
-  const float mapChunkHeight = static_cast<float>(Tilemap::CHUNK_SIZE * static_cast<int>(mapTileSize.y));
 
   for (const auto &object : objectGroup.getObjects()) {
     if (!object.visible()) {
@@ -128,18 +125,13 @@ void BuildObjectChunks(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGr
 
     const auto &tileset = textureBank->tilesets[static_cast<std::size_t>(textureIndex)];
     const auto aabb = object.getAABB();
-
-    const float tileWidth = aabb.width > 0.0f ? aabb.width : static_cast<float>(tileset.tileWidth);
-    const float tileHeight = aabb.height > 0.0f ? aabb.height : static_cast<float>(tileset.tileHeight);
-
-    const float posX = object.getPosition().x;
-    const float posY = object.getPosition().y - tileHeight;
+    const auto pos = object.getPosition();
 
     Tilemap::Chunk chunk;
-    chunk.chunkX = static_cast<int>(std::floor(posX / mapChunkWidth));
-    chunk.chunkY = static_cast<int>(std::floor(posY / mapChunkHeight));
+    chunk.chunkX = static_cast<int>(pos.x + aabb.width / 2.0f);
+    chunk.chunkY = static_cast<int>(pos.y + aabb.height / 2.0f);
     chunk.layerIndex = layerIndex;
-    chunk.destRect = Rectangle{posX, posY, tileWidth, tileHeight};
+    chunk.destRect = Rectangle{pos.x, pos.y, aabb.width, aabb.height};
 
     Tilemap::ChunkTile tile;
     tile.tileGid = gid;
@@ -166,17 +158,19 @@ void BuildObjectCollisions(const tmx::Map &tilemap, const tmx::ObjectGroup &obje
       continue;
     }
 
+    const auto aabb = object.getAABB();
+    const auto pos = object.getPosition();
+
     Tilemap::Chunk chunk;
-    chunk.chunkX = 0;
-    chunk.chunkY = 0;
+    chunk.chunkX = static_cast<int>(pos.x + aabb.width / 2.0f);
+    chunk.chunkY = static_cast<int>(pos.y + aabb.height / 2.0f);
     chunk.layerIndex = layerIndex;
     chunk.isCollision = true;
 
     Tilemap::CollisionData collision;
     collision.shape = static_cast<Tilemap::CollisionShape>(object.getShape());
-    auto const aabb = object.getAABB();
     collision.AABB = Rectangle{aabb.left, aabb.top, aabb.width, aabb.height};
-    collision.position = Vector2{object.getPosition().x, object.getPosition().y};
+    collision.position = Vector2{pos.x, pos.y};
     collision.rotation = object.getRotation();
 
     const auto &points = object.getPoints();
