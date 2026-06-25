@@ -18,7 +18,7 @@ namespace TilemapInternal {
 constexpr std::uint32_t TMX_FLIP_BITS_REMOVAL = 0x1FFFFFFFU;
 
 int CeilDiv(int value, int divisor);
-Rectangle ComputeSourceRect(const Tilemap::TilemapTileset &tileset, std::uint32_t gid);
+Rectangle ComputeSourceRect(const Tilemap::TilemapTileObject &tile, std::uint32_t gid);
 
 std::shared_ptr<Tilemap::TilemapTextureBank> LoadTilesetTextures(const tmx::Map &tilemap, const std::string &mapRelativePath);
 

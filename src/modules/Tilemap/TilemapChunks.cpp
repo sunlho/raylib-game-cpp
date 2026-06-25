@@ -55,19 +55,14 @@ void BuildLayerChunks(const tmx::Map &tilemap, const tmx::TileLayer &layer, int 
             continue;
           }
 
-          const int textureIndex = FindTilesetIndexByGid(*textureBank, gid);
-          if (textureIndex < 0) {
+          const auto tile = textureBank->getTile(gid);
+          if (!tile) {
             continue;
           }
 
-          const auto &tileset = textureBank->tilesets[static_cast<std::size_t>(textureIndex)];
-
-          const auto tile = tileset.getTile(gid);
-
           Tilemap::ChunkTile chunkTile;
           chunkTile.tileGid = gid;
-          chunkTile.textureIndex = textureIndex;
-          chunkTile.srcRect = ComputeSourceRect(tileset, gid);
+          chunkTile.srcRect = tile->srcRect;
           chunkTile.destRect = Rectangle{
               static_cast<float>(tileX * tileWidth),
               static_cast<float>(tileY * tileHeight),
@@ -118,36 +113,35 @@ void BuildObjectChunks(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGr
       continue;
     }
 
-    const int textureIndex = FindTilesetIndexByGid(*textureBank, gid);
-    if (textureIndex < 0) {
+    const auto tile = textureBank->getTile(gid);
+    if (!tile) {
       continue;
     }
 
-    const auto &tileset = textureBank->tilesets[static_cast<std::size_t>(textureIndex)];
+    const auto mapTileSize = tilemap.getTileSize();
     const auto aabb = object.getAABB();
     const auto pos = object.getPosition();
 
     Tilemap::Chunk chunk;
-    chunk.chunkX = static_cast<int>(pos.x + aabb.width / 2.0f);
-    chunk.chunkY = static_cast<int>(pos.y + aabb.height / 2.0f);
+    chunk.chunkX = static_cast<int>(std::floor(pos.x / (Tilemap::CHUNK_SIZE * mapTileSize.x)));
+    chunk.chunkY = static_cast<int>(std::floor(pos.y / (Tilemap::CHUNK_SIZE * mapTileSize.y)));
     chunk.layerIndex = layerIndex;
-    chunk.destRect = Rectangle{pos.x, pos.y, aabb.width, aabb.height};
+    chunk.destRect = Rectangle{pos.x, pos.y - aabb.height, aabb.width, aabb.height};
 
-    Tilemap::ChunkTile tile;
-    tile.tileGid = gid;
-    tile.textureIndex = textureIndex;
-    tile.srcRect = ComputeSourceRect(tileset, gid);
-    tile.destRect = chunk.destRect;
+    Tilemap::ChunkTile chunkTile;
+    chunkTile.tileGid = gid;
+    chunkTile.srcRect = tile->srcRect;
+    chunkTile.destRect = chunk.destRect;
 
-    const auto &properties = object.getProperties();
+    const auto &properties = tile->properties;
     for (const auto &prop : properties) {
       if (prop.getName() == "needsYSort" && prop.getType() == tmx::Property::Type::Boolean) {
-        tile.needsYSort = prop.getBoolValue();
+        chunkTile.needsYSort = prop.getBoolValue();
         break;
       }
     }
 
-    chunk.tiles.push_back(tile);
+    chunk.tiles.push_back(chunkTile);
     loadedMap.chunks.push_back(std::move(chunk));
   }
 }
@@ -158,12 +152,13 @@ void BuildObjectCollisions(const tmx::Map &tilemap, const tmx::ObjectGroup &obje
       continue;
     }
 
+    const auto mapTileSize = tilemap.getTileSize();
     const auto aabb = object.getAABB();
     const auto pos = object.getPosition();
 
     Tilemap::Chunk chunk;
-    chunk.chunkX = static_cast<int>(pos.x + aabb.width / 2.0f);
-    chunk.chunkY = static_cast<int>(pos.y + aabb.height / 2.0f);
+    chunk.chunkX = static_cast<int>(std::floor(pos.x / (Tilemap::CHUNK_SIZE * mapTileSize.x)));
+    chunk.chunkY = static_cast<int>(std::floor(pos.y / (Tilemap::CHUNK_SIZE * mapTileSize.y)));
     chunk.layerIndex = layerIndex;
     chunk.isCollision = true;
 

@@ -22,7 +22,6 @@ struct MapBounds {
 
 struct ChunkTile {
   std::uint32_t tileGid = 0;
-  int textureIndex = -1;
   Rectangle srcRect = {0};
   Rectangle destRect = {0};
   bool needsYSort = false;
@@ -77,35 +76,26 @@ struct Chunk {
 };
 
 struct TilemapTileObject {
+  std::string texturePath;
+  Rectangle srcRect = {0};
+  int tileWidth = 0;
+  int tileHeight = 0;
   std::vector<Tilemap::CollisionData> collisions;
   std::vector<tmx::Property> properties;
 };
 
-struct TilemapTileset {
-  Texture2D texture = {0};
-  std::uint32_t firstGid = 0;
-  std::uint32_t lastGid = 0;
-  int tileWidth = 0;
-  int tileHeight = 0;
-  int columnCount = 0;
-  int spacing = 0;
-  int margin = 0;
-
+struct TilemapTextureBank {
+  std::unordered_map<std::string, Texture2D> textureCache;
   std::unordered_map<std::uint32_t, TilemapTileObject> tiles;
 
-  const TilemapTileObject *getTile(uint32_t gid) const {
+  Texture2D getOrLoadTexture(const std::string &path);
+  const TilemapTileObject *getTile(std::uint32_t gid) const {
     const auto it = tiles.find(gid);
-
     if (it != tiles.end()) {
       return &it->second;
     }
-
     return nullptr;
   }
-};
-
-struct TilemapTextureBank {
-  std::vector<TilemapTileset> tilesets;
   ~TilemapTextureBank();
 };
 
@@ -116,9 +106,6 @@ struct LoadedMap {
 };
 
 bool LoadFromPath(const std::string &path, LoadedMap &loadedMap);
-
-int FindTilesetIndexByGid(const TilemapTextureBank &textureBank, std::uint32_t gid);
-const TilemapTileset *FindTilesetByGid(const TilemapTextureBank &textureBank, std::uint32_t gid);
 
 void CreateCollisionEntity(flecs::world &world, b2WorldId physicsWorld, const std::vector<Tilemap::CollisionData> &collisions, const Rectangle &tileRect, int layerIndex, flecs::entity layerGroup);
 

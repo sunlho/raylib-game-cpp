@@ -130,9 +130,10 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
   auto &activeData = world.get_mut<ActiveMapData>();
   activeData.textureBank = loadedMap->textureBank;
 
-  if (activeData.textureBank && !activeData.textureBank->tilesets.empty()) {
-    activeData.tileWidth = activeData.textureBank->tilesets[0].tileWidth;
-    activeData.tileHeight = activeData.textureBank->tilesets[0].tileHeight;
+  if (activeData.textureBank && !activeData.textureBank->tiles.empty()) {
+    const auto &firstTile = activeData.textureBank->tiles.begin()->second;
+    activeData.tileWidth = firstTile.tileWidth;
+    activeData.tileHeight = firstTile.tileHeight;
   }
 
   std::unordered_map<int, flecs::entity> layerGroups;
@@ -157,8 +158,7 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
     }
 
     for (const auto &chunkTile : chunk.tiles) {
-      const auto tileset = Tilemap::FindTilesetByGid(*activeData.textureBank, chunkTile.tileGid);
-      const auto tileObject = tileset->getTile(chunkTile.tileGid);
+      const auto tileObject = activeData.textureBank->getTile(chunkTile.tileGid);
       if (tileObject && !tileObject->collisions.empty()) {
         Tilemap::CreateCollisionEntity(world, Physics::Id, tileObject->collisions, chunkTile.destRect, chunk.layerIndex, groupIt->second);
       }
@@ -217,8 +217,6 @@ module::module(flecs::world &world) {
         int centerChunkX = static_cast<int>(std::floor(camState.value.target.x / chunkPixelW));
         int centerChunkY = static_cast<int>(std::floor(camState.value.target.y / chunkPixelH));
 
-        const int tilesetCount = static_cast<int>(activeData.textureBank->tilesets.size());
-
         for (int dx = -1; dx <= 1; ++dx) {
           for (int dy = -1; dy <= 1; ++dy) {
             int chunkX = centerChunkX + dx;
@@ -233,17 +231,18 @@ module::module(flecs::world &world) {
             const auto &tiles = keyIt->second;
 
             for (const auto &tile : tiles) {
-              if (tile.textureIndex < 0 || tile.textureIndex >= tilesetCount) {
+              const auto tileObject = activeData.textureBank->getTile(tile.tileGid);
+              if (!tileObject || tileObject->texturePath.empty()) {
                 continue;
               }
 
-              const auto &tileset = activeData.textureBank->tilesets[static_cast<std::size_t>(tile.textureIndex)];
-              if (tileset.texture.id == 0) {
+              Texture2D textureToUse = activeData.textureBank->getOrLoadTexture(tileObject->texturePath);
+              if (textureToUse.id == 0) {
                 continue;
               }
 
               DrawTexturePro(
-                  tileset.texture,
+                  textureToUse,
                   tile.srcRect,
                   tile.destRect,
                   Vector2{0.0f, 0.0f},
