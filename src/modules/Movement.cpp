@@ -75,7 +75,7 @@ module::module(flecs::world &world) {
         position.value.x = ClampAxisToBounds(position.value.x, halfExtents.x, mapBounds.dimension.x);
         position.value.y = ClampAxisToBounds(position.value.y, halfExtents.y, mapBounds.dimension.y);
 
-        renderComponent.sortY = Rendering::GetSortYByLayer(renderComponent.layerIndex, position.value.y + halfExtents.y);
+        renderComponent.sortY = position.value.y + halfExtents.y;
       });
 
   world.system<const Rendering::Position>("Follow Camera Target")
@@ -83,13 +83,12 @@ module::module(flecs::world &world) {
       .kind<Movement::Phases::CameraFollow>()
       .each([](flecs::iter &it, size_t i, const Rendering::Position &position) {
         auto world = it.world();
-        auto mainCamera = world.singleton<GameCamera::MainCamera>();
-        auto &cameraState = mainCamera.get_mut<GameCamera::CameraState>();
+        auto &mainCamera = world.get_mut<GameCamera::MainCamera>();
         const auto mapBounds = world.get<Tilemap::MapBounds>();
         const auto renderTargetSize = world.get<Rendering::RenderTargetSize>();
-        const bool snapTargetToPixel = cameraState.snapTargetToPixel;
+        const bool snapTargetToPixel = mainCamera.snapTargetToPixel;
 
-        Vector2 target = Vector2Add(position.value, cameraState.followOffset);
+        Vector2 target = Vector2Add(position.value, mainCamera.followOffset);
 
         if (snapTargetToPixel) {
           target.x = roundf(target.x);
@@ -97,20 +96,20 @@ module::module(flecs::world &world) {
         }
 
         const float deltaTime = it.delta_time();
-        const float followAmount = 1.0f - expf(-cameraState.followSpeed * deltaTime);
+        const float followAmount = 1.0f - expf(-mainCamera.followSpeed * deltaTime);
         const float lerpAmount = followAmount > 1.0f ? 1.0f : followAmount;
-        cameraState.value.target = Vector2Lerp(cameraState.value.target, target, lerpAmount);
+        mainCamera.value.target = Vector2Lerp(mainCamera.value.target, target, lerpAmount);
 
         const Vector2 viewportHalf = Vector2{
             renderTargetSize.dimension.x * 0.5f,
             renderTargetSize.dimension.y * 0.5f};
 
-        cameraState.value.target.x = ClampAxisToBounds(cameraState.value.target.x, viewportHalf.x, mapBounds.dimension.x);
-        cameraState.value.target.y = ClampAxisToBounds(cameraState.value.target.y, viewportHalf.y, mapBounds.dimension.y);
+        mainCamera.value.target.x = ClampAxisToBounds(mainCamera.value.target.x, viewportHalf.x, mapBounds.dimension.x);
+        mainCamera.value.target.y = ClampAxisToBounds(mainCamera.value.target.y, viewportHalf.y, mapBounds.dimension.y);
 
         if (snapTargetToPixel) {
-          cameraState.value.target.x = roundf(cameraState.value.target.x);
-          cameraState.value.target.y = roundf(cameraState.value.target.y);
+          mainCamera.value.target.x = roundf(mainCamera.value.target.x);
+          mainCamera.value.target.y = roundf(mainCamera.value.target.y);
         }
       });
 }

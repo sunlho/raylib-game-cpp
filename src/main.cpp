@@ -65,21 +65,8 @@ int main() {
 
   const auto fixedUpdate = buildPipeline<Simulation::FixedUpdate>(world);
 
-  world.component<Rendering::RenderTargetSize>()
-      .add(flecs::Singleton)
-      .set<Rendering::RenderTargetSize>({Vector2{static_cast<float>(BASE_WIDTH), static_cast<float>(BASE_HEIGHT)}});
-
-  world.component<Rendering::RenderTargetState>()
-      .add(flecs::Singleton)
-      .set<Rendering::RenderTargetState>({});
-
-  world.component<RenderTexture2D>()
-      .add(flecs::Singleton)
-      .set<RenderTexture2D>({});
-
-  world.component<GameCamera::MainCamera>()
-      .add(flecs::Singleton)
-      .set<GameCamera::CameraState>({Camera2D{Vector2{0.0f, 0.0f}, Vector2{0.0f, 0.0f}, 0.0f, 1.0f}, true, true});
+  auto &renderTargetSize = world.get_mut<Rendering::RenderTargetSize>();
+  renderTargetSize.dimension = Vector2{static_cast<float>(BASE_WIDTH), static_cast<float>(BASE_HEIGHT)};
 
   MapManage::SetMapPath(world, "Map.tmx");
 

@@ -23,15 +23,16 @@ struct Position {
 
 struct Renderable {
   virtual ~Renderable() = default;
-  virtual void Draw(flecs::entity entity, const Position &position) const = 0;
+  virtual void Draw(const Position &position) const = 0;
 };
 
 struct RenderComponent {
   std::shared_ptr<Renderable> object;
   int sortY = 0;
   bool visible = true;
-  int layerIndex = 0;
 };
+
+struct SortableTag {};
 
 struct RenderVisibility {
   bool visible = true;
@@ -45,15 +46,6 @@ struct RenderTargetSize {
 
 struct RenderTargetState {
   bool active = false;
-};
-
-struct SortableRenderEntry {
-  int sortY;
-  std::function<void()> draw;
-};
-
-struct SortableRenderQueue {
-  std::vector<SortableRenderEntry> entries;
 };
 
 static inline int GetSortYByLayer(int layerIndex, int posY) {

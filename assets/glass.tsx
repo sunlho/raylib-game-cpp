@@ -31,17 +31,7 @@
    <property name="needsYSort" type="bool" value="true"/>
   </properties>
  </tile>
- <tile id="17">
-  <properties>
-   <property name="needsYSort" type="bool" value="true"/>
-  </properties>
- </tile>
  <tile id="18">
-  <properties>
-   <property name="needsYSort" type="bool" value="true"/>
-  </properties>
- </tile>
- <tile id="19">
   <properties>
    <property name="needsYSort" type="bool" value="true"/>
   </properties>
@@ -52,16 +42,6 @@
   </properties>
  </tile>
  <tile id="23">
-  <properties>
-   <property name="needsYSort" type="bool" value="true"/>
-  </properties>
- </tile>
- <tile id="25">
-  <properties>
-   <property name="needsYSort" type="bool" value="true"/>
-  </properties>
- </tile>
- <tile id="27">
   <properties>
    <property name="needsYSort" type="bool" value="true"/>
   </properties>

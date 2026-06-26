@@ -89,12 +89,13 @@ struct TilemapTextureBank {
   std::unordered_map<std::uint32_t, TilemapTileObject> tiles;
 
   Texture2D getOrLoadTexture(const std::string &path);
+  const Texture2D *getTexture(const std::string &path) const {
+    auto it = textureCache.find(path);
+    return it != textureCache.end() ? &it->second : nullptr;
+  }
   const TilemapTileObject *getTile(std::uint32_t gid) const {
-    const auto it = tiles.find(gid);
-    if (it != tiles.end()) {
-      return &it->second;
-    }
-    return nullptr;
+    auto it = tiles.find(gid);
+    return it != tiles.end() ? &it->second : nullptr;
   }
   ~TilemapTextureBank();
 };
@@ -103,6 +104,10 @@ struct LoadedMap {
   MapBounds bounds = {};
   std::shared_ptr<TilemapTextureBank> textureBank;
   std::vector<Chunk> chunks;
+  int tileWidth = 0;
+  int tileHeight = 0;
+  int chunkPixelWidth = 0;
+  int chunkPixelHeight = 0;
 };
 
 bool LoadFromPath(const std::string &path, LoadedMap &loadedMap);

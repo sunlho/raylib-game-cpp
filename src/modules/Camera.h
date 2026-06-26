@@ -10,9 +10,7 @@ struct Phases {
   struct End2D {};
 };
 
-struct MainCamera {};
-
-struct CameraState {
+struct MainCamera {
   Camera2D value = {
       Vector2{0.0f, 0.0f},
       Vector2{0.0f, 0.0f},

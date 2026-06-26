@@ -64,10 +64,10 @@ flecs::opaque<Vector, Elem> std_vector_support(flecs::world &world) {
 }
 
 template <typename T>
-void GenerateImplicitReflectionBinds(flecs::world &world) {
+flecs::entity GenerateImplicitReflectionBinds(flecs::world &world) {
   flecs::untyped_component cmp = world.component<T>();
   if (cmp.has<flecs::Type>() || cmp.has<EcsOpaque>()) {
-    return;
+    return cmp;
   }
 
   if constexpr (is_std_vector<T>::value) {
@@ -103,11 +103,13 @@ void GenerateImplicitReflectionBinds(flecs::world &world) {
       cmp.member<MemberType>(names[i].data(), std::extent_v<MemberType>, offset);
     });
   }
+
+  return cmp;
 }
 } // namespace Detail
 
 template <typename T>
-void Register(flecs::world &world, bool singleton = false) {
-  Detail::GenerateImplicitReflectionBinds<T>(world);
+flecs::entity Register(flecs::world &world, bool singleton = false) {
+  return Detail::GenerateImplicitReflectionBinds<T>(world);
 }
 } // namespace Reflection

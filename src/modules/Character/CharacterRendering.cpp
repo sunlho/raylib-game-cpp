@@ -7,12 +7,12 @@ namespace {
 
 class CharacterRenderable final : public Rendering::Renderable {
 public:
-  CharacterRenderable() {
+  CharacterRenderable(flecs::entity entity) : entity_(entity) {
   }
 
-  void Draw(flecs::entity entity, const Rendering::Position &position) const override {
-    auto spriteSet = entity.get<SpriteSet>();
-    auto controller = entity.get<AnimationController>();
+  void Draw(const Rendering::Position &position) const override {
+    auto spriteSet = entity_.get<SpriteSet>();
+    auto controller = entity_.get<AnimationController>();
 
     if (!spriteSet.loaded) {
       return;
@@ -65,6 +65,9 @@ public:
 
     DrawTexturePro(animation.texture, src, dest, origin, 0.0f, WHITE);
   }
+
+private:
+  flecs::entity entity_;
 };
 
 } // namespace
@@ -73,17 +76,18 @@ void RegisterCharacterRendering(flecs::world &world) {
   world.observer<SpriteSet, const AnimationController, const Rendering::Position>("Create Character Renderable Observer")
       .event(flecs::OnSet)
       .each([](flecs::entity entity, SpriteSet &spriteSet, const AnimationController &controller, const Rendering::Position &position) {
-        auto renderable = std::make_shared<CharacterRenderable>();
+        CharacterRenderable renderable(entity);
+        auto renderablePtr = std::make_shared<CharacterRenderable>(entity);
         Rendering::RenderComponent renderComponent;
-        renderComponent.object = renderable;
+        renderComponent.object = renderablePtr;
         renderComponent.visible = true;
 
         const Vector2 halfExtents = GetSpriteHalfExtents(spriteSet, controller);
 
-        renderComponent.layerIndex = 4;
-        renderComponent.sortY = Rendering::GetSortYByLayer(renderComponent.layerIndex, position.value.y + halfExtents.y);
+        renderComponent.sortY = position.value.y + halfExtents.y;
 
         entity.add<Rendering::RenderComponent>().set(renderComponent);
+        entity.add<Rendering::SortableTag>();
       });
 }
 

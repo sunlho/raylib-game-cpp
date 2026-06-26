@@ -80,14 +80,15 @@ module::module(flecs::world &world) {
   Reflection::Register<Rectangle>(world);
   Reflection::Register<RenderComponent>(world);
   Reflection::Register<RenderVisibility>(world);
-  Reflection::Register<RenderTargetSize>(world);
-  Reflection::Register<RenderTargetState>(world);
-  Reflection::Register<RenderTexture2D>(world);
-  Reflection::Register<SortableRenderQueue>(world);
-
-  world.component<SortableRenderQueue>()
-      .add(flecs::Singleton);
-  world.set<SortableRenderQueue>({});
+  Reflection::Register<RenderTargetSize>(world)
+      .add(flecs::Singleton)
+      .set<RenderTargetSize>({});
+  Reflection::Register<RenderTargetState>(world)
+      .add(flecs::Singleton)
+      .set<RenderTargetState>({});
+  Reflection::Register<RenderTexture2D>(world)
+      .add(flecs::Singleton)
+      .set<RenderTexture2D>({});
 
   world.system("BeginDrawing")
       .kind<Phases::PreDraw>()
@@ -108,12 +109,13 @@ module::module(flecs::world &world) {
 
   world.system<const Position, const RenderComponent>("Draw Renderables")
       .kind<Phases::Draw>()
-      .each([](flecs::entity entity, const Position &p, const RenderComponent &renderable) {
+      .without<SortableTag>()
+      .each([](const Position &p, const RenderComponent &renderable) {
         if (!renderable.visible || !renderable.object) {
           return;
         }
 
-        renderable.object->Draw(entity, p);
+        renderable.object->Draw(p);
       });
 
   world.system("EndDraw")

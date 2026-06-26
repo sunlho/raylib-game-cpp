@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstddef>
 #include <format>
 #include <list>
@@ -15,32 +16,44 @@
 #include "modules/Tilemap/Tilemap.h"
 
 namespace MapManage {
+
+class TileRenderable final : public Rendering::Renderable, Tilemap::ChunkTile {
+public:
+  TileRenderable(std::shared_ptr<const Tilemap::TilemapTextureBank> bank, const Tilemap::ChunkTile &tile)
+      : textureBank(std::move(bank)) {
+    tileGid = tile.tileGid;
+    srcRect = tile.srcRect;
+    destRect = tile.destRect;
+  }
+
+  void Draw(const Rendering::Position &position) const override {
+
+    const auto tileObject = textureBank->getTile(tileGid);
+    if (!tileObject || tileObject->texturePath.empty()) {
+      return;
+    }
+
+    const Texture2D *texture = textureBank->getTexture(tileObject->texturePath);
+    if (!texture) {
+      return;
+    }
+
+    DrawTexturePro(
+        *texture,
+        srcRect,
+        destRect,
+        Vector2{0.0f, 0.0f},
+        0.0f,
+        WHITE);
+  }
+
+private:
+  std::shared_ptr<const Tilemap::TilemapTextureBank> textureBank;
+};
+
 namespace {
 
 bool disableDebugDraw = true;
-
-struct ChunkKey {
-  int x;
-  int y;
-
-  bool operator==(const ChunkKey &other) const {
-    return x == other.x && y == other.y;
-  }
-};
-
-struct ChunkKeyHash {
-  std::size_t operator()(const ChunkKey &key) const {
-    return std::hash<int>()(key.x) ^ (std::hash<int>()(key.y) << 1);
-  }
-};
-
-struct ActiveMapData {
-  std::shared_ptr<Tilemap::TilemapTextureBank> textureBank;
-  std::unordered_map<ChunkKey, std::vector<Tilemap::ChunkTile>, ChunkKeyHash> staticTiles;
-  std::unordered_map<ChunkKey, std::vector<Tilemap::ChunkTile>, ChunkKeyHash> sortableTiles;
-  int tileWidth = 0;
-  int tileHeight = 0;
-};
 
 struct CachedMapEntry {
   Tilemap::LoadedMap loadedMap;
@@ -53,6 +66,11 @@ struct MapCacheState {
   std::size_t maxSize = 3;
   std::size_t hitCount = 0;
   std::size_t missCount = 0;
+};
+
+struct RenderableSortData {
+  const Rendering::Position *position;
+  const Rendering::RenderComponent *renderComponent;
 };
 
 void DestroyCurrentMap(MapManage::MapState &mapState) {
@@ -129,11 +147,13 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
 
   auto &activeData = world.get_mut<ActiveMapData>();
   activeData.textureBank = loadedMap->textureBank;
+  activeData.tileWidth = loadedMap->tileWidth;
+  activeData.tileHeight = loadedMap->tileHeight;
+  activeData.chunkPixelWidth = loadedMap->chunkPixelWidth;
+  activeData.chunkPixelHeight = loadedMap->chunkPixelHeight;
 
   if (activeData.textureBank && !activeData.textureBank->tiles.empty()) {
     const auto &firstTile = activeData.textureBank->tiles.begin()->second;
-    activeData.tileWidth = firstTile.tileWidth;
-    activeData.tileHeight = firstTile.tileHeight;
   }
 
   std::unordered_map<int, flecs::entity> layerGroups;
@@ -165,7 +185,13 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
 
       ChunkKey key{chunk.chunkX, chunk.chunkY};
       if (chunkTile.needsYSort) {
-        activeData.sortableTiles[key].push_back(chunkTile);
+        TileRenderable *renderable = new TileRenderable(activeData.textureBank, chunkTile);
+        Rendering::RenderComponent renderComponent;
+        renderComponent.object = std::shared_ptr<Rendering::Renderable>(renderable);
+        renderComponent.sortY = static_cast<int>(chunkTile.destRect.y + chunkTile.destRect.height);
+        renderComponent.visible = true;
+
+        activeData.sortableTiles[key].push_back(std::move(renderComponent));
       } else {
         activeData.staticTiles[key].push_back(chunkTile);
       }
@@ -176,28 +202,20 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
 } // namespace
 
 module::module(flecs::world &world) {
-  Reflection::Register<Tilemap::MapBounds>(world);
+  Reflection::Register<Tilemap::MapBounds>(world)
+      .add(flecs::Singleton)
+      .set<Tilemap::MapBounds>({});
   Reflection::Register<Tilemap::CollisionData>(world);
   Reflection::Register<MapPath>(world);
-  Reflection::Register<ActiveMapData>(world);
-  Reflection::Register<MapCacheState>(world);
-  Reflection::Register<MapState>(world);
-
-  world.component<Tilemap::MapBounds>()
-      .add(flecs::Singleton);
-  world.set<Tilemap::MapBounds>({});
-
-  world.component<MapState>()
-      .add(flecs::Singleton);
-  world.set<MapState>({});
-
-  world.component<ActiveMapData>()
-      .add(flecs::Singleton);
-  world.set<ActiveMapData>({});
-
-  world.component<MapCacheState>()
-      .add(flecs::Singleton);
-  world.set<MapCacheState>({});
+  Reflection::Register<ActiveMapData>(world)
+      .add(flecs::Singleton)
+      .set<ActiveMapData>({});
+  Reflection::Register<MapCacheState>(world)
+      .add(flecs::Singleton)
+      .set<MapCacheState>({});
+  Reflection::Register<MapState>(world)
+      .add(flecs::Singleton)
+      .set<MapState>({});
 
   world.system("Draw Static Chunks")
       .kind<Rendering::Phases::Background>()
@@ -205,17 +223,14 @@ module::module(flecs::world &world) {
         auto world = it.world();
         const auto &activeData = world.get<ActiveMapData>();
 
-        if (!activeData.textureBank || activeData.staticTiles.empty() || activeData.tileWidth <= 0 || activeData.tileHeight <= 0) {
+        if (!activeData.textureBank || activeData.staticTiles.empty() || activeData.chunkPixelWidth <= 0 || activeData.chunkPixelHeight <= 0) {
           return;
         }
 
-        const auto &mainCamera = world.singleton<GameCamera::MainCamera>();
-        const auto &camState = mainCamera.get<GameCamera::CameraState>();
-        const int chunkPixelW = Tilemap::CHUNK_SIZE * activeData.tileWidth;
-        const int chunkPixelH = Tilemap::CHUNK_SIZE * activeData.tileHeight;
+        const auto &mainCamera = world.get<GameCamera::MainCamera>();
 
-        int centerChunkX = static_cast<int>(std::floor(camState.value.target.x / chunkPixelW));
-        int centerChunkY = static_cast<int>(std::floor(camState.value.target.y / chunkPixelH));
+        int centerChunkX = static_cast<int>(std::floor(mainCamera.value.target.x / activeData.chunkPixelWidth));
+        int centerChunkY = static_cast<int>(std::floor(mainCamera.value.target.y / activeData.chunkPixelHeight));
 
         for (int dx = -1; dx <= 1; ++dx) {
           for (int dy = -1; dy <= 1; ++dy) {
@@ -253,6 +268,90 @@ module::module(flecs::world &world) {
         }
       });
 
+  world.system<const Rendering::Position, const Rendering::RenderComponent>()
+      .with<const Rendering::SortableTag>()
+      .kind<Rendering::Phases::Draw>()
+      .run([](flecs::iter &it) {
+        std::vector<RenderableSortData> sortData;
+
+        auto world = it.world();
+        const auto &activeData = world.get<ActiveMapData>();
+
+        if (!activeData.textureBank || activeData.staticTiles.empty() || activeData.chunkPixelWidth <= 0 || activeData.chunkPixelHeight <= 0) {
+          return;
+        }
+
+        const auto &mainCamera = world.get<GameCamera::MainCamera>();
+
+        int centerChunkX = static_cast<int>(std::floor(mainCamera.value.target.x / activeData.chunkPixelWidth));
+        int centerChunkY = static_cast<int>(std::floor(mainCamera.value.target.y / activeData.chunkPixelHeight));
+
+        while (it.next()) {
+          auto position = it.field<const Rendering::Position>(0);
+          auto renderComponent = it.field<const Rendering::RenderComponent>(1);
+
+          for (auto i : it) {
+            sortData.push_back(RenderableSortData{&position[i], &renderComponent[i]});
+          }
+        }
+
+        int count = it.count();
+        for (int dx = -1; dx <= 1; ++dx) {
+          for (int dy = -1; dy <= 1; ++dy) {
+            int chunkX = centerChunkX + dx;
+            int chunkY = centerChunkY + dy;
+
+            ChunkKey key{chunkX, chunkY};
+            auto keyIt = activeData.sortableTiles.find(key);
+            if (keyIt == activeData.sortableTiles.end()) {
+              continue;
+            }
+            count += static_cast<int>(keyIt->second.size());
+          }
+        }
+
+        sortData.reserve(count);
+
+        for (int dx = -1; dx <= 1; ++dx) {
+          for (int dy = -1; dy <= 1; ++dy) {
+            int chunkX = centerChunkX + dx;
+            int chunkY = centerChunkY + dy;
+
+            ChunkKey key{chunkX, chunkY};
+            auto keyIt = activeData.sortableTiles.find(key);
+            if (keyIt == activeData.sortableTiles.end()) {
+              continue;
+            }
+
+            const auto &renderComponents = keyIt->second;
+
+            for (const auto &renderComponent : renderComponents) {
+              if (!renderComponent.object || !renderComponent.visible) {
+                continue;
+              }
+
+              Rendering::Position position;
+              position.value.x = static_cast<float>(chunkX * activeData.chunkPixelWidth);
+              position.value.y = static_cast<float>(chunkY * activeData.chunkPixelHeight);
+
+              sortData.push_back(RenderableSortData{&position, const_cast<Rendering::RenderComponent *>(&renderComponent)});
+            }
+          }
+        }
+
+        std::sort(sortData.begin(), sortData.end(), [](const RenderableSortData &a, const RenderableSortData &b) {
+          return a.renderComponent->sortY < b.renderComponent->sortY;
+        });
+
+        for (const auto &data : sortData) {
+          if (!data.renderComponent->object || !data.renderComponent->visible) {
+            continue;
+          }
+
+          data.renderComponent->object->Draw(*data.position);
+        }
+      });
+
   world.observer<const MapPath>("Load Map Observer")
       .event(flecs::OnSet)
       .each([](flecs::entity entity, const MapPath &mapPath) {
@@ -264,10 +363,6 @@ module::module(flecs::world &world) {
 void SetMapPath(flecs::world &world, const std::string &path) {
   auto mapEntity = world.entity("Map");
   mapEntity.set<MapPath>(MapPath{path});
-
-  if (IsWindowReady()) {
-    LoadMapFromPath(world, MapPath{path});
-  }
 }
 
 } // namespace MapManage

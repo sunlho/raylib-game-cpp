@@ -86,10 +86,10 @@ void BuildLayerChunks(const tmx::Map &tilemap, const tmx::TileLayer &layer, int 
       }
 
       chunk.destRect = Rectangle{
-          static_cast<float>(bx * Tilemap::CHUNK_SIZE * tileWidth),
-          static_cast<float>(by * Tilemap::CHUNK_SIZE * tileHeight),
-          static_cast<float>(Tilemap::CHUNK_SIZE * tileWidth),
-          static_cast<float>(Tilemap::CHUNK_SIZE * tileHeight)};
+          static_cast<float>(bx * loadedMap.chunkPixelWidth),
+          static_cast<float>(by * loadedMap.chunkPixelHeight),
+          static_cast<float>(loadedMap.chunkPixelWidth),
+          static_cast<float>(loadedMap.chunkPixelHeight)};
 
       loadedMap.chunks.push_back(std::move(chunk));
     }
@@ -123,8 +123,8 @@ void BuildObjectChunks(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGr
     const auto pos = object.getPosition();
 
     Tilemap::Chunk chunk;
-    chunk.chunkX = static_cast<int>(std::floor(pos.x / (Tilemap::CHUNK_SIZE * mapTileSize.x)));
-    chunk.chunkY = static_cast<int>(std::floor(pos.y / (Tilemap::CHUNK_SIZE * mapTileSize.y)));
+    chunk.chunkX = static_cast<int>(std::floor(pos.x / loadedMap.chunkPixelWidth));
+    chunk.chunkY = static_cast<int>(std::floor(pos.y / loadedMap.chunkPixelHeight));
     chunk.layerIndex = layerIndex;
     chunk.destRect = Rectangle{pos.x, pos.y - aabb.height, aabb.width, aabb.height};
 
@@ -157,8 +157,8 @@ void BuildObjectCollisions(const tmx::Map &tilemap, const tmx::ObjectGroup &obje
     const auto pos = object.getPosition();
 
     Tilemap::Chunk chunk;
-    chunk.chunkX = static_cast<int>(std::floor(pos.x / (Tilemap::CHUNK_SIZE * mapTileSize.x)));
-    chunk.chunkY = static_cast<int>(std::floor(pos.y / (Tilemap::CHUNK_SIZE * mapTileSize.y)));
+    chunk.chunkX = static_cast<int>(std::floor(pos.x / loadedMap.chunkPixelWidth));
+    chunk.chunkY = static_cast<int>(std::floor(pos.y / loadedMap.chunkPixelHeight));
     chunk.layerIndex = layerIndex;
     chunk.isCollision = true;
 
