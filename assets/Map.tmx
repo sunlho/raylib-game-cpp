@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.12.2" orientation="orthogonal" renderorder="right-down" width="100" height="100" tilewidth="34" tileheight="24" infinite="0" nextlayerid="21" nextobjectid="52">
+<map version="1.10" tiledversion="1.12.2" orientation="orthogonal" renderorder="right-down" width="100" height="100" tilewidth="34" tileheight="24" infinite="0" nextlayerid="21" nextobjectid="54">
  <tileset firstgid="1" name="water" tilewidth="32" tileheight="32" tilecount="8" columns="8">
   <image source="Tiles/water.png" width="256" height="32"/>
   <tile id="0">
@@ -436,12 +436,9 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 </data>
  </layer>
- <objectgroup id="19" name="Collisions" class="Collisions" visible="0">
-  <object id="48" type="Internal" x="669" y="401">
-   <polygon points="203,-1 203,-73 701,-73 701,23 770,23 770,447 736,447 736,495 102,495 102,423 -1,423 -1,-1"/>
-  </object>
-  <object id="49" x="663" y="397">
-   <polygon points="-1,-1 203,-1 203,-73 715,-73 715,23 783,23 783,467 749,467 749,515 101,515 101,443 -1,443"/>
+ <objectgroup id="19" name="Collisions" class="Collisions">
+  <object id="53" x="662" y="396">
+   <polygon points="0,0 204,0 204,-72 716,-72 716,24 784,24 784,468 750,468 750,516 272,516 272,480 279,480 279,500 743,500 743,452 777,452 777,28 708,28 708,-68 210,-68 210,4 6,4 6,428 109,428 109,500 200,500 200,480 206,480 206,516 102,516 102,444 0,444"/>
   </object>
  </objectgroup>
 </map>
