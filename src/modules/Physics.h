@@ -12,6 +12,7 @@ typedef struct PhysicsWorld {
 
 typedef struct PhysicsBody {
   b2BodyId id;
+  b2ShapeId shapeId;
 } PhysicsBody;
 
 extern b2WorldId Id;

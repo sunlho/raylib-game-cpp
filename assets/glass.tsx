@@ -26,16 +26,6 @@
    <property name="needsYSort" type="bool" value="true"/>
   </properties>
  </tile>
- <tile id="16">
-  <properties>
-   <property name="needsYSort" type="bool" value="true"/>
-  </properties>
- </tile>
- <tile id="18">
-  <properties>
-   <property name="needsYSort" type="bool" value="true"/>
-  </properties>
- </tile>
  <tile id="22">
   <properties>
    <property name="needsYSort" type="bool" value="true"/>

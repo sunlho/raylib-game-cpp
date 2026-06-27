@@ -29,7 +29,7 @@ add_executable(${PROJECT_NAME}
 
     src/modules/Tilemap/Tilemap.cpp
     src/modules/Tilemap/TilemapChunks.cpp
-    src/modules/Tilemap/TilemapCollision.cpp
+    src/modules/Tilemap/TilemapPhysics.cpp
     src/modules/Tilemap/TilemapTextures.cpp
 
     src/modules/Debug/DebugDraw.cpp

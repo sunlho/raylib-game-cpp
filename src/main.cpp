@@ -110,6 +110,10 @@ int main() {
       isDebugDrawEnabled = !isDebugDrawEnabled;
     }
 
+    if (IsKeyPressed(KEY_F2)) {
+      Character::TestChangeCharacterPhysicsShapeCenter(world);
+    }
+
     if (IsKeyPressed(KEY_PAGE_UP)) {
       SetTargetFPS(std::min(240, GetFPS() + 10));
     }
