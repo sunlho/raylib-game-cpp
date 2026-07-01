@@ -24,6 +24,7 @@ struct ChunkTile {
   std::uint32_t tileGid = 0;
   Rectangle srcRect = {0};
   Rectangle destRect = {0};
+  float floor = 0.0f;
   bool needsYSort = false;
 };
 

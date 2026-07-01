@@ -188,6 +188,7 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
         TileRenderable *renderable = new TileRenderable(activeData.textureBank, chunkTile);
         Rendering::RenderComponent renderComponent;
         renderComponent.object = std::shared_ptr<Rendering::Renderable>(renderable);
+        renderComponent.floor = chunkTile.floor;
         renderComponent.sortY = static_cast<int>(chunkTile.destRect.y + chunkTile.destRect.height);
         renderComponent.visible = true;
 
@@ -268,7 +269,7 @@ module::module(flecs::world &world) {
         }
       });
 
-  world.system<const Rendering::Position, const Rendering::RenderComponent>()
+  world.system<const Rendering::Position, const Rendering::RenderComponent>("Draw Sort Chunks")
       .with<const Rendering::SortableTag>()
       .kind<Rendering::Phases::Draw>()
       .run([](flecs::iter &it) {
@@ -340,6 +341,10 @@ module::module(flecs::world &world) {
         }
 
         std::sort(sortData.begin(), sortData.end(), [](const RenderableSortData &a, const RenderableSortData &b) {
+          if (a.renderComponent->floor != b.renderComponent->floor) {
+            return a.renderComponent->floor < b.renderComponent->floor;
+          }
+
           return a.renderComponent->sortY < b.renderComponent->sortY;
         });
 

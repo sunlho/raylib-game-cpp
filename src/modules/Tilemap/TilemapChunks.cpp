@@ -4,12 +4,31 @@
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
+#include <vector>
 
 namespace Tilemap {
 namespace TilemapInternal {
 
 int CeilDiv(int value, int divisor) {
   return (value + divisor - 1) / divisor;
+}
+
+float GetFloorProperty(const std::vector<tmx::Property> &properties) {
+  for (const auto &prop : properties) {
+    if (prop.getName() != "floor") {
+      continue;
+    }
+
+    if (prop.getType() == tmx::Property::Type::Float) {
+      return prop.getFloatValue();
+    }
+
+    if (prop.getType() == tmx::Property::Type::Int) {
+      return static_cast<float>(prop.getIntValue());
+    }
+  }
+
+  return 0.0f;
 }
 
 void BuildLayerChunks(const tmx::Map &tilemap, const tmx::TileLayer &layer, int layerIndex, Tilemap::LoadedMap &loadedMap) {
@@ -26,6 +45,7 @@ void BuildLayerChunks(const tmx::Map &tilemap, const tmx::TileLayer &layer, int 
   const int height = static_cast<int>(mapTileCount.y);
   const int tileWidth = static_cast<int>(mapTileSize.x);
   const int tileHeight = static_cast<int>(mapTileSize.y);
+  const float layerFloor = GetFloorProperty(layer.getProperties());
 
   const int chunkCountX = CeilDiv(width, Tilemap::CHUNK_SIZE);
   const int chunkCountY = CeilDiv(height, Tilemap::CHUNK_SIZE);
@@ -63,6 +83,7 @@ void BuildLayerChunks(const tmx::Map &tilemap, const tmx::TileLayer &layer, int 
           Tilemap::ChunkTile chunkTile;
           chunkTile.tileGid = gid;
           chunkTile.srcRect = tile->srcRect;
+          chunkTile.floor = layerFloor;
           chunkTile.destRect = Rectangle{
               static_cast<float>(tileX * tileWidth),
               static_cast<float>(tileY * tileHeight),
@@ -102,6 +123,7 @@ void BuildObjectChunks(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGr
   }
 
   const auto &textureBank = loadedMap.textureBank;
+  const float layerFloor = GetFloorProperty(objectGroup.getProperties());
 
   for (const auto &object : objectGroup.getObjects()) {
     if (!object.visible()) {
@@ -132,6 +154,7 @@ void BuildObjectChunks(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGr
     chunkTile.tileGid = gid;
     chunkTile.srcRect = tile->srcRect;
     chunkTile.destRect = chunk.destRect;
+    chunkTile.floor = layerFloor;
 
     const auto &properties = tile->properties;
     for (const auto &prop : properties) {

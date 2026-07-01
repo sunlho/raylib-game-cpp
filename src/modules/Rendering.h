@@ -28,6 +28,7 @@ struct Renderable {
 
 struct RenderComponent {
   std::shared_ptr<Renderable> object;
+  float floor = 2.5f;
   int sortY = 0;
   bool visible = true;
 };
