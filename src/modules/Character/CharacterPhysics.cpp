@@ -1,6 +1,7 @@
 #include "box2d/box2d.h"
 
 #include "CharacterInternal.h"
+
 #include "modules/Physics.h"
 #include "modules/Rendering.h"
 

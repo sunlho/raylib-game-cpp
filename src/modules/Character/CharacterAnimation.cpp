@@ -5,7 +5,9 @@
 #include "raylib.h"
 #include "raymath.h"
 
+#include "Character.h"
 #include "CharacterInternal.h"
+
 #include "modules/Movement.h"
 #include "modules/Reflection.h"
 
@@ -69,10 +71,10 @@ void RegisterCharacterAnimation(flecs::world &world) {
           return;
         }
 
-        const auto idleKey = CharacterInternal::BuildAnimationKey(CharacterState::Idle, info.direction);
+        const auto idleKey = Character::BuildAnimationKey(CharacterState::Idle, info.direction);
 
         if (!idle.initialized || idle.wasMoving) {
-          idle.timer = CharacterInternal::RandomDelaySeconds(idle.minDelay, idle.maxDelay);
+          idle.timer = Character::RandomDelaySeconds(idle.minDelay, idle.maxDelay);
           idle.waiting = true;
           idle.playing = false;
           idle.wasMoving = false;
@@ -90,7 +92,7 @@ void RegisterCharacterAnimation(flecs::world &world) {
             controller.PlayAnimation(idleKey, true);
             controller.currentFrame = 0;
             controller.elapsed = 0.0f;
-            if (auto *clip = CharacterInternal::FindClip(controller, idleKey)) {
+            if (auto *clip = Character::FindClip(controller, idleKey)) {
               clip->loop = false;
             }
           }
@@ -103,7 +105,7 @@ void RegisterCharacterAnimation(flecs::world &world) {
               controller.currentFrame >= std::max(1, clip->frameCount) - 1) {
             idle.playing = false;
             idle.waiting = true;
-            idle.timer = CharacterInternal::RandomDelaySeconds(idle.minDelay, idle.maxDelay);
+            idle.timer = Character::RandomDelaySeconds(idle.minDelay, idle.maxDelay);
             controller.currentFrame = 0;
             controller.elapsed = 0.0f;
           }

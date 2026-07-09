@@ -10,7 +10,7 @@
 #include "modules/Character/Character.h"
 #include "modules/Debug/DebugDraw.h"
 #include "modules/Debug/PhysicsDebugDraw.h"
-#include "modules/MapManage.h"
+#include "modules/Map/Map.h"
 #include "modules/Movement.h"
 #include "modules/Physics.h"
 #include "modules/Reflection.h"
@@ -50,7 +50,7 @@ int main() {
   world.import<Movement::module>();
   world.import<Character::module>();
   world.import<Stairs::module>();
-  world.import<MapManage::module>();
+  world.import<MapManager::module>();
 
   const auto preDraw = buildPipeline<Rendering::Phases::PreDraw>(world);
   const auto background = buildPipeline<Rendering::Phases::Background>(world);
@@ -70,7 +70,7 @@ int main() {
   auto &renderTargetSize = world.get_mut<Rendering::RenderTargetSize>();
   renderTargetSize.dimension = Vector2{static_cast<float>(BASE_WIDTH), static_cast<float>(BASE_HEIGHT)};
 
-  MapManage::SetMapPath(world, "Map.tmx");
+  MapManager::SetMapPath(world, "Map.tmx");
 
   Character::SpriteSet playerSprites;
   playerSprites.entries = {

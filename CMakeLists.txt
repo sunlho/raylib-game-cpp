@@ -15,11 +15,15 @@ find_package(box2d REQUIRED)
 add_executable(${PROJECT_NAME}
     src/main.cpp
     src/modules/Camera.cpp
-    src/modules/MapManage.cpp
     src/modules/Movement.cpp
     src/modules/Rendering.cpp
     src/modules/Physics.cpp
     src/modules/Stairs/Stairs.cpp
+
+    src/modules/Map/Map.cpp
+    src/modules/Map/MapCache.cpp
+    src/modules/Map/MapLoader.cpp
+    src/modules/Map/MapRendering.cpp
 
     src/modules/Character/Character.cpp
     src/modules/Character/CharacterAnimation.cpp
@@ -39,6 +43,10 @@ add_executable(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE raylib flecs::flecs_static box2d::box2d tmxlite::tmxlite libwebp::libwebp pfr::pfr)
+
+if(MSVC)
+    target_link_options(${PROJECT_NAME} PRIVATE /ignore:4099)
+endif()
 
 if(NOT CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(ASSETS_PATH "${CMAKE_SOURCE_DIR}/assets")

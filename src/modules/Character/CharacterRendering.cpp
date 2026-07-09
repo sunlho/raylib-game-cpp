@@ -1,76 +1,68 @@
 
 #include "CharacterInternal.h"
+
 #include "modules/Rendering.h"
 
 namespace Character {
-namespace {
 
-class CharacterRenderable final : public Rendering::Renderable {
-public:
-  CharacterRenderable(flecs::entity entity) : entity_(entity) {
+CharacterRenderable::CharacterRenderable(flecs::entity entity) : entity_(entity) {
+}
+
+void CharacterRenderable::Draw(const Rendering::Position &position) const {
+  auto spriteSet = entity_.get<SpriteSet>();
+  auto controller = entity_.get<AnimationController>();
+
+  if (!spriteSet.loaded) {
+    return;
   }
 
-  void Draw(const Rendering::Position &position) const override {
-    auto spriteSet = entity_.get<SpriteSet>();
-    auto controller = entity_.get<AnimationController>();
-
-    if (!spriteSet.loaded) {
-      return;
-    }
-
-    const auto *clip = controller.GetCurrentAnimation();
-    if (!clip) {
-      return;
-    }
-
-    auto *entry = spriteSet.FindEntry(clip->name);
-    if (!entry) {
-      return;
-    }
-
-    auto &animation = entry->animation;
-    if (animation.texture.id == 0 || animation.frameCount <= 0) {
-      return;
-    }
-
-    int frame = controller.currentFrame;
-    if (frame < 0) {
-      frame = 0;
-    }
-    if (frame >= animation.frameCount) {
-      frame = animation.frameCount - 1;
-    }
-
-    if (animation.bytesPerFrame > 0 &&
-        frame != animation.lastFrame &&
-        static_cast<std::size_t>(animation.bytesPerFrame) * (static_cast<std::size_t>(frame) + 1) <= animation.pixels.size()) {
-      UpdateTexture(animation.texture, animation.pixels.data() + static_cast<std::size_t>(animation.bytesPerFrame) * frame);
-
-      animation.lastFrame = frame;
-    }
-
-    Rectangle src = {
-        0.0f,
-        0.0f,
-        static_cast<float>(animation.width),
-        static_cast<float>(animation.height)};
-    Rectangle dest = {
-        position.value.x,
-        position.value.y,
-        static_cast<float>(animation.width) * spriteSet.scale,
-        static_cast<float>(animation.height) * spriteSet.scale};
-    dest.x = roundf(dest.x);
-    dest.y = roundf(dest.y);
-    Vector2 origin = spriteSet.useCenterOrigin ? Vector2{roundf(dest.width * 0.5f), roundf(dest.height * 0.5f)} : spriteSet.origin;
-
-    DrawTexturePro(animation.texture, src, dest, origin, 0.0f, WHITE);
+  const auto *clip = controller.GetCurrentAnimation();
+  if (!clip) {
+    return;
   }
 
-private:
-  flecs::entity entity_;
-};
+  auto *entry = spriteSet.FindEntry(clip->name);
+  if (!entry) {
+    return;
+  }
 
-} // namespace
+  auto &animation = entry->animation;
+  if (animation.texture.id == 0 || animation.frameCount <= 0) {
+    return;
+  }
+
+  int frame = controller.currentFrame;
+  if (frame < 0) {
+    frame = 0;
+  }
+  if (frame >= animation.frameCount) {
+    frame = animation.frameCount - 1;
+  }
+
+  if (animation.bytesPerFrame > 0 &&
+      frame != animation.lastFrame &&
+      static_cast<std::size_t>(animation.bytesPerFrame) * (static_cast<std::size_t>(frame) + 1) <= animation.pixels.size()) {
+    UpdateTexture(animation.texture, animation.pixels.data() + static_cast<std::size_t>(animation.bytesPerFrame) * frame);
+
+    animation.lastFrame = frame;
+  }
+
+  Rectangle src = {
+      0.0f,
+      0.0f,
+      static_cast<float>(animation.width),
+      static_cast<float>(animation.height)};
+  Rectangle dest = {
+      position.value.x,
+      position.value.y,
+      static_cast<float>(animation.width) * spriteSet.scale,
+      static_cast<float>(animation.height) * spriteSet.scale};
+  dest.x = roundf(dest.x);
+  dest.y = roundf(dest.y);
+  Vector2 origin = spriteSet.useCenterOrigin ? Vector2{roundf(dest.width * 0.5f), roundf(dest.height * 0.5f)} : spriteSet.origin;
+
+  DrawTexturePro(animation.texture, src, dest, origin, 0.0f, WHITE);
+}
 
 void RegisterCharacterRendering(flecs::world &world) {
   world.observer<SpriteSet, const AnimationController, const Rendering::Position>("Create Character Renderable Observer")

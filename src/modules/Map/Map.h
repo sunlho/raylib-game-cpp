@@ -1,13 +1,17 @@
 #pragma once
 
+#include <cstddef>
+#include <memory>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 #include "flecs.h"
 
 #include "modules/Rendering.h"
 #include "modules/Tilemap/Tilemap.h"
 
-namespace MapManage {
+namespace MapManager {
 
 struct MapPath {
   std::string value;
@@ -49,4 +53,4 @@ struct module {
   module(flecs::world &world);
 };
 
-} // namespace MapManage
+} // namespace MapManager

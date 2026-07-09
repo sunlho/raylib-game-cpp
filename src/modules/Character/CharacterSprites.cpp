@@ -9,6 +9,7 @@
 #include "webp/demux.h"
 
 #include "CharacterInternal.h"
+
 #include "modules/Assets.h"
 #include "modules/Rendering.h"
 
@@ -63,9 +64,7 @@ bool LoadWebPAnimation(std::string_view path, SpriteAnimation &animation, int &o
       break;
     }
 
-    std::memcpy(animation.pixels.data() + static_cast<std::size_t>(bytesPerFrame) * frameIndex,
-                rgba,
-                static_cast<std::size_t>(bytesPerFrame));
+    std::memcpy(animation.pixels.data() + static_cast<std::size_t>(bytesPerFrame) * frameIndex, rgba, static_cast<std::size_t>(bytesPerFrame));
     frameIndex++;
   }
 
@@ -158,14 +157,14 @@ void RegisterCharacterSprites(flecs::world &world) {
           return;
         }
 
-        const auto desired = CharacterInternal::BuildAnimationKey(info.state, info.direction);
+        const auto desired = Character::BuildAnimationKey(info.state, info.direction);
         if (spriteSet.FindEntry(desired)) {
           controller.PlayAnimation(desired);
           return;
         }
 
         if (info.state != CharacterState::Idle) {
-          const auto fallback = CharacterInternal::BuildAnimationKey(CharacterState::Idle, info.direction);
+          const auto fallback = Character::BuildAnimationKey(CharacterState::Idle, info.direction);
           if (spriteSet.FindEntry(fallback)) {
             controller.PlayAnimation(fallback);
           }
