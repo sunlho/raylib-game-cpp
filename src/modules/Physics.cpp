@@ -19,6 +19,45 @@ static std::unique_ptr<b2DebugDraw> debugDraw;
 
 b2WorldId Id = b2_nullWorldId;
 
+void *EncodeEntityUserData(flecs::entity_t entityId) {
+  static_assert(sizeof(flecs::entity_t) <= sizeof(uintptr_t));
+  return reinterpret_cast<void *>(static_cast<uintptr_t>(entityId));
+}
+
+flecs::entity_t DecodeEntityUserData(void *userData) {
+  return static_cast<flecs::entity_t>(reinterpret_cast<uintptr_t>(userData));
+}
+
+void AttachEntityUserData(const PhysicsBody &physicsBody, flecs::entity_t entityId) {
+  void *userData = EncodeEntityUserData(entityId);
+
+  if (b2Body_IsValid(physicsBody.id)) {
+    b2Body_SetUserData(physicsBody.id, userData);
+  }
+
+  if (b2Shape_IsValid(physicsBody.shapeId)) {
+    b2Shape_SetUserData(physicsBody.shapeId, userData);
+  }
+}
+
+flecs::entity_t GetEntityFromShape(b2ShapeId shapeId) {
+  if (!b2Shape_IsValid(shapeId)) {
+    return 0;
+  }
+
+  void *shapeData = b2Shape_GetUserData(shapeId);
+  if (shapeData) {
+    return DecodeEntityUserData(shapeData);
+  }
+
+  const b2BodyId bodyId = b2Shape_GetBody(shapeId);
+  if (!b2Body_IsValid(bodyId)) {
+    return 0;
+  }
+
+  return DecodeEntityUserData(b2Body_GetUserData(bodyId));
+}
+
 module::module(flecs::world &world) {
   debugDraw = std::make_unique<b2DebugDraw>(PhysicsDebugDraw::CreateDebugDraw());
 
@@ -48,7 +87,15 @@ module::module(flecs::world &world) {
   world.observer<PhysicsBody>("Destroy Body Observer")
       .event(flecs::OnRemove)
       .each([](flecs::iter &it, size_t i, PhysicsBody &physicsBody) {
-        b2DestroyBody(physicsBody.id);
+        if (b2Body_IsValid(physicsBody.id)) {
+          b2DestroyBody(physicsBody.id);
+        }
+      });
+
+  world.observer<PhysicsBody>("Attach Physics Body User Data")
+      .event(flecs::OnSet)
+      .each([](flecs::entity entity, PhysicsBody &physicsBody) {
+        AttachEntityUserData(physicsBody, entity.id());
       });
 }
 

@@ -11,6 +11,7 @@
 #include "tmxlite/ObjectGroup.hpp"
 
 #include "modules/Rendering.h"
+#include "modules/Stairs/Stairs.h"
 
 namespace Tilemap {
 
@@ -105,6 +106,7 @@ struct LoadedMap {
   MapBounds bounds = {};
   std::shared_ptr<TilemapTextureBank> textureBank;
   std::vector<Chunk> chunks;
+  std::vector<Stairs::StairData> stairs;
   int tileWidth = 0;
   int tileHeight = 0;
   int chunkPixelWidth = 0;

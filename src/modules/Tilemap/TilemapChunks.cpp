@@ -6,6 +6,8 @@
 #include <cstdint>
 #include <vector>
 
+#include "modules/Stairs/Stairs.h"
+
 namespace Tilemap {
 namespace TilemapInternal {
 
@@ -29,6 +31,24 @@ float GetFloorProperty(const std::vector<tmx::Property> &properties) {
   }
 
   return 0.0f;
+}
+
+bool TryGetNumberProperty(const tmx::Property &prop, const char *name, float &value) {
+  if (prop.getName() != name) {
+    return false;
+  }
+
+  if (prop.getType() == tmx::Property::Type::Float) {
+    value = prop.getFloatValue();
+    return true;
+  }
+
+  if (prop.getType() == tmx::Property::Type::Int) {
+    value = static_cast<float>(prop.getIntValue());
+    return true;
+  }
+
+  return false;
 }
 
 void BuildLayerChunks(const tmx::Map &tilemap, const tmx::TileLayer &layer, int layerIndex, Tilemap::LoadedMap &loadedMap) {
@@ -132,6 +152,35 @@ void BuildObjectChunks(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGr
 
     const std::uint32_t gid = object.getTileID() & TMX_FLIP_BITS_REMOVAL;
     if (gid == 0) {
+      const auto className = object.getClass();
+      if (className == "Stairs") {
+        Stairs::StairData stairData;
+
+        const auto aabb = object.getAABB();
+        stairData.bounds = Rectangle{aabb.left, aabb.top, aabb.width, aabb.height};
+        for (const auto &prop : object.getProperties()) {
+          if (TryGetNumberProperty(prop, "directionX", stairData.directionX)) {
+            continue;
+          }
+
+          if (TryGetNumberProperty(prop, "lowFloor", stairData.lowFloor)) {
+            continue;
+          }
+
+          if (TryGetNumberProperty(prop, "highFloor", stairData.highFloor)) {
+            continue;
+          }
+
+          if (TryGetNumberProperty(prop, "floorSwitchT", stairData.floorSwitchT)) {
+            continue;
+          }
+
+          if (prop.getName() == "enabled" && prop.getType() == tmx::Property::Type::Boolean) {
+            stairData.enabled = prop.getBoolValue();
+          }
+        }
+        loadedMap.stairs.push_back(stairData);
+      }
       continue;
     }
 

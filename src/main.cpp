@@ -16,6 +16,7 @@
 #include "modules/Reflection.h"
 #include "modules/Rendering.h"
 #include "modules/Simulation.h"
+#include "modules/Stairs/Stairs.h"
 #include "modules/Utils.h"
 
 // constexpr int SCREEN_WIDTH = 2560;
@@ -48,6 +49,7 @@ int main() {
   world.import<Physics::module>();
   world.import<Movement::module>();
   world.import<Character::module>();
+  world.import<Stairs::module>();
   world.import<MapManage::module>();
 
   const auto preDraw = buildPipeline<Rendering::Phases::PreDraw>(world);
@@ -98,6 +100,7 @@ int main() {
       .set<Character::SpriteSet>(playerSprites)
       .set<Rendering::Position>({Vector2{700.0f, 700.0f}})
       .set<Physics::PhysicsBody>({b2_nullBodyId})
+      .set<Stairs::FloorState>({2.5f, 2.5f})
       .set<Movement::Velocity>({Vector2{0.0f, 0.0f}})
       .set<Movement::MoveSpeed>({85.0f});
 
@@ -108,10 +111,6 @@ int main() {
   while (!WindowShouldClose()) {
     if (IsKeyPressed(KEY_F1)) {
       isDebugDrawEnabled = !isDebugDrawEnabled;
-    }
-
-    if (IsKeyPressed(KEY_F2)) {
-      Character::TestChangeCharacterPhysicsShapeCenter(world);
     }
 
     if (IsKeyPressed(KEY_PAGE_UP)) {

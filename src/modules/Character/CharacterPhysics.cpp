@@ -10,9 +10,10 @@ void RegisterCharacterPhysics(flecs::world &world) {
   world.observer<Physics::PhysicsBody, Rendering::Position>("Create Character Physics Observer")
       .with<PlayerTag>()
       .event(flecs::OnSet)
-      .each([](Physics::PhysicsBody &physicsBody, Rendering::Position &position) {
+      .each([](flecs::entity entity, Physics::PhysicsBody &physicsBody, Rendering::Position &position) {
         if (b2Body_IsValid(physicsBody.id)) {
           b2Body_SetTransform(physicsBody.id, b2Vec2{position.value.x, position.value.y}, b2Rot{1.0f, 0.0f});
+          Physics::AttachEntityUserData(physicsBody, entity.id());
           return;
         }
         b2BodyDef bodyDef = b2DefaultBodyDef();
@@ -25,26 +26,12 @@ void RegisterCharacterPhysics(flecs::world &world) {
         b2ShapeDef shapeDef = b2DefaultShapeDef();
         shapeDef.density = 1.0f;
         shapeDef.material.friction = 0.3f;
+        shapeDef.enableSensorEvents = true;
         b2ShapeId shapeId = b2CreateCircleShape(body, &shapeDef, &circle);
         physicsBody.id = body;
         physicsBody.shapeId = shapeId;
+        Physics::AttachEntityUserData(physicsBody, entity.id());
       });
-}
-
-void TestChangeCharacterPhysicsShapeCenter(flecs::world &world) {
-  world.each([](flecs::entity e, Physics::PhysicsBody &physicsBody, Rendering::Position &pos) {
-    if (b2Body_IsValid(physicsBody.id)) {
-      const auto shape = b2Shape_GetCircle(physicsBody.shapeId);
-
-      if (shape.center.y == 0.0f) {
-        b2Circle circle = {0.0f, 10.0f, shape.radius};
-        b2Shape_SetCircle(physicsBody.shapeId, &circle);
-      } else {
-        b2Circle circle = {0.0f, 0.0f, shape.radius};
-        b2Shape_SetCircle(physicsBody.shapeId, &circle);
-      }
-    }
-  });
 }
 
 } // namespace Character

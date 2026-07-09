@@ -104,8 +104,6 @@ struct NPCTag {};
 
 Vector2 GetSpriteHalfExtents(const SpriteSet &spriteSet, const AnimationController &controller);
 
-void TestChangeCharacterPhysicsShapeCenter(flecs::world &world);
-
 struct module {
   module(flecs::world &world);
 };

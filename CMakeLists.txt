@@ -19,6 +19,7 @@ add_executable(${PROJECT_NAME}
     src/modules/Movement.cpp
     src/modules/Rendering.cpp
     src/modules/Physics.cpp
+    src/modules/Stairs/Stairs.cpp
 
     src/modules/Character/Character.cpp
     src/modules/Character/CharacterAnimation.cpp

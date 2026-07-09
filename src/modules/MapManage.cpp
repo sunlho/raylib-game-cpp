@@ -13,6 +13,7 @@
 #include "modules/Debug/DebugDraw.h"
 #include "modules/Reflection.h"
 #include "modules/Rendering.h"
+#include "modules/Stairs/Stairs.h"
 #include "modules/Tilemap/Tilemap.h"
 
 namespace MapManage {
@@ -140,6 +141,17 @@ void LoadMapFromPath(flecs::world world, const MapManage::MapPath &mapPath) {
 
   mapState.mapRoot = world.entity("MapRoot");
   mapState.currentPath = mapPath.value;
+
+  for (std::size_t stairIndex = 0; stairIndex < loadedMap->stairs.size(); ++stairIndex) {
+    const std::string stairName = std::format("MapStair_{}", stairIndex);
+    auto stairEntity = world.entity(stairName.c_str());
+
+    if (mapState.mapRoot.is_valid()) {
+      stairEntity.add(flecs::ChildOf, mapState.mapRoot);
+    }
+
+    stairEntity.set<Stairs::StairData>(loadedMap->stairs[stairIndex]);
+  }
 
   auto &mapBounds = world.get_mut<Tilemap::MapBounds>();
   mapBounds = loadedMap->bounds;
