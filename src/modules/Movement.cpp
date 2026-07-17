@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <iostream>
 
-#include "box2d/box2d.h"
 #include "raylib.h"
 #include "raymath.h"
 
@@ -61,27 +60,6 @@ module::module(flecs::world &world) {
         velocity.value = Vector2Scale(direction, speed.value);
       });
 
-  world.system<const Velocity, const Physics::PhysicsBody>("Apply Entity Velocity")
-      .kind<Simulation::PrePhysics>()
-      .each([](const Velocity &velocity, const Physics::PhysicsBody &physicsBody) {
-        if (!b2Body_IsValid(physicsBody.id)) {
-          return;
-        }
-
-        b2Body_SetLinearVelocity(physicsBody.id, b2Vec2{velocity.value.x, velocity.value.y});
-      });
-
-  world.system<Rendering::Position, const Physics::PhysicsBody>("Sync Physics Positions")
-      .kind<Simulation::PostPhysics>()
-      .each([](Rendering::Position &position, const Physics::PhysicsBody &physicsBody) {
-        if (!b2Body_IsValid(physicsBody.id)) {
-          return;
-        }
-
-        b2Vec2 bodyPosition = b2Body_GetPosition(physicsBody.id);
-        position.value = Vector2{bodyPosition.x, bodyPosition.y};
-      });
-
   world.system<Rendering::Position, const Character::SpriteSet, const Character::AnimationController, Rendering::RenderComponent, const Physics::PhysicsBody>("Clamp Player To Map Bounds")
       .kind<Simulation::FixedUpdate>()
       .with<PlayerControlled>()
@@ -93,12 +71,8 @@ module::module(flecs::world &world) {
             ClampAxisToBounds(position.value.x, halfExtents.x, mapBounds.dimension.x),
             ClampAxisToBounds(position.value.y, halfExtents.y, mapBounds.dimension.y)};
 
-        if ((clampedPosition.x != position.value.x || clampedPosition.y != position.value.y) &&
-            b2Body_IsValid(physicsBody.id)) {
-          b2Body_SetTransform(
-              physicsBody.id,
-              b2Vec2{clampedPosition.x, clampedPosition.y},
-              b2Body_GetRotation(physicsBody.id));
+        if (clampedPosition.x != position.value.x || clampedPosition.y != position.value.y) {
+          Physics::Relocate(physicsBody, clampedPosition);
         }
 
         position.value = clampedPosition;

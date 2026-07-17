@@ -5,7 +5,6 @@
 #include <sstream>
 #include <utility>
 
-#include "box2d/box2d.h"
 #include "raylib.h"
 
 #include "../Camera.h"
@@ -49,11 +48,7 @@ void TeleportPlayer(flecs::world &world, float x, float y) {
     player.get_mut<Movement::Velocity>().value = Vector2{0.0f, 0.0f};
   }
   if (player.has<Physics::PhysicsBody>()) {
-    const b2BodyId body = player.get<Physics::PhysicsBody>().id;
-    if (b2Body_IsValid(body)) {
-      b2Body_SetTransform(body, b2Vec2{x, y}, b2Body_GetRotation(body));
-      b2Body_SetLinearVelocity(body, b2Vec2{0.0f, 0.0f});
-    }
+    Physics::Relocate(player.get<Physics::PhysicsBody>(), destination, true);
   }
 
   world.get_mut<GameCamera::MainCamera>().value.target = destination;

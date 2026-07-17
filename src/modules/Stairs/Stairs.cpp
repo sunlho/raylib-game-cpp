@@ -109,10 +109,7 @@ flecs::entity WrapEntity(flecs::world world, flecs::entity_t entityId) {
   return flecs::entity(world.c_ptr(), entityId);
 }
 
-void HandleSensorBegin(flecs::world &world, b2ShapeId sensorShapeId, b2ShapeId visitorShapeId) {
-  const flecs::entity_t stairId = Physics::GetEntityFromShape(sensorShapeId);
-  const flecs::entity_t visitorId = Physics::GetEntityFromShape(visitorShapeId);
-
+void HandleSensorBegin(flecs::world &world, flecs::entity_t stairId, flecs::entity_t visitorId) {
   if (stairId == 0 || visitorId == 0 || !ecs_is_alive(world.c_ptr(), stairId) || !ecs_is_alive(world.c_ptr(), visitorId)) {
     return;
   }
@@ -133,10 +130,7 @@ void HandleSensorBegin(flecs::world &world, b2ShapeId sensorShapeId, b2ShapeId v
   visitorEntity.modified<FloorState>();
 }
 
-void HandleSensorEnd(flecs::world &world, b2ShapeId sensorShapeId, b2ShapeId visitorShapeId) {
-  const flecs::entity_t stairId = Physics::GetEntityFromShape(sensorShapeId);
-  const flecs::entity_t visitorId = Physics::GetEntityFromShape(visitorShapeId);
-
+void HandleSensorEnd(flecs::world &world, flecs::entity_t stairId, flecs::entity_t visitorId) {
   if (stairId == 0 || visitorId == 0 || !ecs_is_alive(world.c_ptr(), visitorId)) {
     return;
   }
@@ -151,32 +145,6 @@ void HandleSensorEnd(flecs::world &world, b2ShapeId sensorShapeId, b2ShapeId vis
   visitorEntity.modified<FloorState>();
 }
 
-b2BodyId CreateStairSensorBody(const StairData &stair, b2ShapeId &shapeId) {
-  shapeId = b2_nullShapeId;
-  if (!stair.enabled || stair.bounds.width <= 0.0f || stair.bounds.height <= 0.0f) {
-    return b2_nullBodyId;
-  }
-
-  b2BodyDef bodyDef = b2DefaultBodyDef();
-  bodyDef.type = b2_staticBody;
-  bodyDef.position = b2Vec2{
-      stair.bounds.x + stair.bounds.width * 0.5f,
-      stair.bounds.y + stair.bounds.height * 0.5f};
-
-  b2BodyId bodyId = b2CreateBody(Physics::Id, &bodyDef);
-
-  b2ShapeDef shapeDef = b2DefaultShapeDef();
-  shapeDef.isSensor = true;
-  shapeDef.enableSensorEvents = true;
-  shapeDef.density = 0.0f;
-
-  const b2Polygon box = b2MakeBox(
-      std::max(stair.bounds.width * 0.5f, 0.5f),
-      std::max(stair.bounds.height * 0.5f, 0.5f));
-  shapeId = b2CreatePolygonShape(bodyId, &shapeDef, &box);
-  return bodyId;
-}
-
 } // namespace
 
 module::module(flecs::world &world) {
@@ -186,75 +154,57 @@ module::module(flecs::world &world) {
   world.observer<StairData>("Create Stair Sensor Body")
       .event(flecs::OnSet)
       .each([](flecs::entity entity, StairData &stair) {
-        if (const auto *existingBody = entity.try_get<Physics::PhysicsBody>()) {
-          if (b2Body_IsValid(existingBody->id)) {
-            b2DestroyBody(existingBody->id);
-          }
+        if (!stair.enabled) {
+          Physics::DestroyBody(entity);
+          return;
         }
 
-        b2ShapeId shapeId = b2_nullShapeId;
-        const b2BodyId bodyId = CreateStairSensorBody(stair, shapeId);
-        Physics::PhysicsBody physicsBody{bodyId, shapeId};
-        Physics::AttachEntityUserData(physicsBody, entity.id());
-        entity.set<Physics::PhysicsBody>(physicsBody);
+        Physics::CreateBoxSensor(entity, stair.bounds);
       });
 
   world.system("Process Stair Sensor Events")
-      .kind<Simulation::FixedUpdate>()
+      .kind<Simulation::PostPhysics>()
       .run([](flecs::iter &it) {
         flecs::world world = it.world();
-        const b2SensorEvents events = b2World_GetSensorEvents(Physics::Id);
-
-        for (int i = 0; i < events.beginCount; ++i) {
-          HandleSensorBegin(world, events.beginEvents[i].sensorShapeId, events.beginEvents[i].visitorShapeId);
-        }
-
-        for (int i = 0; i < events.endCount; ++i) {
-          HandleSensorEnd(world, events.endEvents[i].sensorShapeId, events.endEvents[i].visitorShapeId);
+        for (const auto &event : Physics::SensorEvents(world)) {
+          if (event.kind == Physics::SensorEventKind::Begin) {
+            HandleSensorBegin(world, event.sensor, event.visitor);
+          } else {
+            HandleSensorEnd(world, event.sensor, event.visitor);
+          }
         }
       });
 
   world.system<const Rendering::Position, FloorState>("Update Stair Floor State")
       .kind<Simulation::FixedUpdate>()
-      .each([](flecs::iter &it, size_t, const Rendering::Position &position, FloorState &state) {
+      .each([](flecs::entity entity, const Rendering::Position &position, FloorState &state) {
         const Vector2 samplePoint = Vector2Add(position.value, state.sampleOffset);
 
         ResetToBase(state);
 
-        if (state.currentStair == 0 || !ecs_is_alive(it.world().c_ptr(), state.currentStair)) {
+        if (state.currentStair == 0 || !ecs_is_alive(entity.world().c_ptr(), state.currentStair)) {
           state.currentStair = 0;
           state.overlappingStairs.clear();
-          return;
+        } else {
+          flecs::entity stairEntity = WrapEntity(entity.world(), state.currentStair);
+          const StairData *stair = stairEntity.try_get<StairData>();
+          if (!stair || !stair->enabled) {
+            state.currentStair = 0;
+            state.overlappingStairs.clear();
+          } else {
+            ApplyStair(samplePoint, *stair, state);
+          }
         }
 
-        flecs::entity stairEntity = WrapEntity(it.world(), state.currentStair);
-        const StairData *stair = stairEntity.try_get<StairData>();
-        if (!stair || !stair->enabled) {
-          state.currentStair = 0;
-          state.overlappingStairs.clear();
-          return;
+        if (auto *renderComponent = entity.try_get_mut<Rendering::RenderComponent>()) {
+          renderComponent->floor = state.floor;
+          entity.modified<Rendering::RenderComponent>();
         }
 
-        ApplyStair(samplePoint, *stair, state);
-      });
-
-  world.system<const FloorState, Rendering::RenderComponent>("Sync Floor State To Render Component")
-      .kind<Simulation::FixedUpdate>()
-      .each([](const FloorState &state, Rendering::RenderComponent &renderComponent) {
-        renderComponent.floor = state.floor;
-      });
-
-  world.system<const FloorState, const Physics::PhysicsBody>("Change Character Physics Shape Center Based On Floor State")
-      .kind<Simulation::FixedUpdate>()
-      .each([](const FloorState &state, const Physics::PhysicsBody &physicsBody) {
-        if (!b2Body_IsValid(physicsBody.id)) {
-          return;
+        if (const auto *physicsBody = entity.try_get<Physics::PhysicsBody>()) {
+          const float yOffset = (state.floor - 1.5f) * 10.0f;
+          Physics::SetCircleCenter(*physicsBody, Vector2{0.0f, yOffset});
         }
-
-        const auto shape = b2Shape_GetCircle(physicsBody.shapeId);
-        const float yOffset = (state.floor - 1.5f) * 10.0f;
-        b2Circle circle = {0.0f, yOffset, shape.radius};
-        b2Shape_SetCircle(physicsBody.shapeId, &circle);
       });
 }
 

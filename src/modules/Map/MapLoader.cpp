@@ -9,7 +9,6 @@
 #include "Map.h"
 #include "MapInternal.h"
 
-#include "modules/Physics.h"
 #include "modules/Stairs/Stairs.h"
 #include "modules/Tilemap/Tilemap.h"
 
@@ -81,7 +80,7 @@ flecs::entity EnsureLayerGroup(flecs::world &world, std::unordered_map<int, flec
 void IngestTile(ActiveMapData &activeData, flecs::world &world, const Tilemap::Chunk &chunk, const Tilemap::ChunkTile &chunkTile, flecs::entity layerGroup) {
   const auto tileObject = activeData.textureBank->getTile(chunkTile.tileGid);
   if (tileObject && !tileObject->collisions.empty()) {
-    Tilemap::CreateCollisionEntity(world, Physics::Id, tileObject->collisions, chunkTile.destRect, chunk.layerIndex, layerGroup);
+    Tilemap::CreateCollisionEntity(world, tileObject->collisions, chunkTile.destRect, chunk.layerIndex, layerGroup);
   }
 
   ChunkKey key{chunk.chunkX, chunk.chunkY};
@@ -105,7 +104,7 @@ void BuildChunkEntities(flecs::world &world, const Tilemap::LoadedMap &loadedMap
 
   for (const auto &chunk : loadedMap.chunks) {
     if (chunk.isCollision) {
-      Tilemap::CreateCollisionEntity(world, Physics::Id, chunk.collisions, chunk.destRect, chunk.layerIndex, mapRoot);
+      Tilemap::CreateCollisionEntity(world, chunk.collisions, chunk.destRect, chunk.layerIndex, mapRoot);
       continue;
     }
 

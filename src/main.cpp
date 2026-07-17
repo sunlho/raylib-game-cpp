@@ -2,7 +2,6 @@
 #include <memory>
 #include <utility>
 
-#include "box2d/box2d.h"
 #include "flecs.h"
 #include "raylib.h"
 
@@ -11,7 +10,6 @@
 #include "modules/Console/Console.h"
 #include "modules/Console/Register.h"
 #include "modules/Debug/DebugDraw.h"
-#include "modules/Debug/PhysicsDebugDraw.h"
 #include "modules/Map/Map.h"
 #include "modules/Movement.h"
 #include "modules/Physics.h"
@@ -63,7 +61,6 @@ static void CreatePlayer(flecs::world &world) {
       .set<Character::IdleBehavior>({})
       .set<Character::SpriteSet>(std::move(playerSprites))
       .set<Rendering::Position>({playerStart})
-      .set<Physics::PhysicsBody>({b2_nullBodyId})
       .set<Stairs::FloorState>({2.5f, 2.5f})
       .set<Movement::Velocity>({Vector2{0.0f, 0.0f}})
       .set<Movement::MoveSpeed>({85.0f});
@@ -90,8 +87,6 @@ int main() {
   InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "raylib game cpp");
   SetExitKey(KEY_NULL);
   SetTargetFPS(60);
-
-  b2SetLengthUnitsPerMeter(48.0f);
 
   flecs::world world;
   world.set<flecs::Rest>({});
@@ -191,7 +186,7 @@ int main() {
     ecs_run_pipeline(world, sortedWorldDraw, frameTime);
 
     if (isDebugDrawEnabled) {
-      Physics::DebugDraw();
+      Physics::DebugDraw(world);
       DebugDraw::ProcessDrawQueue();
     }
 

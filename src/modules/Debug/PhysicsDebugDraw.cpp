@@ -7,9 +7,6 @@
 #include "raylib.h"
 
 #include "PhysicsDebugDraw.h"
-#include "modules/Physics.h"
-#include "modules/Reflection.h"
-#include "modules/Rendering.h"
 
 namespace PhysicsDebugDraw {
 namespace {

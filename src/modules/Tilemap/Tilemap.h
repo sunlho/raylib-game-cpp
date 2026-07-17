@@ -6,7 +6,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "box2d/box2d.h"
 #include "raylib.h"
 #include "tmxlite/ObjectGroup.hpp"
 
@@ -111,6 +110,6 @@ struct LoadedMap {
 
 bool LoadFromPath(const std::string &path, LoadedMap &loadedMap);
 
-void CreateCollisionEntity(flecs::world &world, b2WorldId physicsWorld, const std::vector<Tilemap::CollisionData> &collisions, const Rectangle &tileRect, int layerIndex, flecs::entity layerGroup);
+void CreateCollisionEntity(flecs::world &world, const std::vector<Tilemap::CollisionData> &collisions, const Rectangle &tileRect, int layerIndex, flecs::entity layerGroup);
 
 } // namespace Tilemap

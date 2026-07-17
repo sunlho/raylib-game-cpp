@@ -2,7 +2,6 @@
 
 #include <vector>
 
-#include "box2d/box2d.h"
 #include "flecs.h"
 #include "raylib.h"
 

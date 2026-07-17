@@ -1,5 +1,3 @@
-#include "box2d/box2d.h"
-
 #include "CharacterInternal.h"
 
 #include "modules/Physics.h"
@@ -8,30 +6,20 @@
 namespace Character {
 
 void RegisterCharacterPhysics(flecs::world &world) {
-  world.observer<Physics::PhysicsBody, Rendering::Position>("Create Character Physics Observer")
+  world.observer<const Rendering::Position>("Create Character Physics Observer")
       .with<PlayerTag>()
       .event(flecs::OnSet)
-      .each([](flecs::entity entity, Physics::PhysicsBody &physicsBody, Rendering::Position &position) {
-        if (b2Body_IsValid(physicsBody.id)) {
-          b2Body_SetTransform(physicsBody.id, b2Vec2{position.value.x, position.value.y}, b2Rot{1.0f, 0.0f});
-          Physics::AttachEntityUserData(physicsBody, entity.id());
+      .each([](flecs::entity entity, const Rendering::Position &position) {
+        if (const auto *body = entity.try_get<Physics::PhysicsBody>()) {
+          Physics::Relocate(*body, position.value);
           return;
         }
-        b2BodyDef bodyDef = b2DefaultBodyDef();
-        bodyDef.type = b2_dynamicBody;
-        bodyDef.position = b2Vec2{position.value.x, position.value.y};
-        bodyDef.fixedRotation = true;
 
-        b2Circle circle = {0.0f, 10.0f, 10.0f};
-        b2BodyId body = b2CreateBody(Physics::Id, &bodyDef);
-        b2ShapeDef shapeDef = b2DefaultShapeDef();
-        shapeDef.density = 1.0f;
-        shapeDef.material.friction = 0.3f;
-        shapeDef.enableSensorEvents = true;
-        b2ShapeId shapeId = b2CreateCircleShape(body, &shapeDef, &circle);
-        physicsBody.id = body;
-        physicsBody.shapeId = shapeId;
-        Physics::AttachEntityUserData(physicsBody, entity.id());
+        Physics::CreateDynamicCircle(
+            entity,
+            position.value,
+            Vector2{0.0f, 10.0f},
+            10.0f);
       });
 }
 

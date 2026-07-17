@@ -1,30 +1,61 @@
 #pragma once
 
-#include "box2d/box2d.h"
+#include <cstdint>
+#include <span>
+
 #include "flecs.h"
+#include "raylib.h"
 
 namespace Physics {
 
-typedef struct PhysicsWorld {
-  b2WorldId id;
-} PhysicsWorld;
+struct PhysicsAccess;
 
-typedef struct PhysicsBody {
-  b2BodyId id;
-  b2ShapeId shapeId;
-} PhysicsBody;
+struct PhysicsBody {
+  PhysicsBody() = default;
 
-extern b2WorldId Id;
+private:
+  std::uint64_t bodyToken = 0;
+  std::uint64_t primaryShapeToken = 0;
+
+  friend struct PhysicsAccess;
+};
+
+enum class StaticCollisionShape {
+  Box,
+  Ellipse,
+  Polygon,
+  Polyline,
+};
+
+enum class SensorEventKind {
+  Begin,
+  End,
+};
+
+struct SensorEvent {
+  SensorEventKind kind = SensorEventKind::Begin;
+  flecs::entity_t sensor = 0;
+  flecs::entity_t visitor = 0;
+};
 
 struct module {
   module(flecs::world &world);
 };
 
-void *EncodeEntityUserData(flecs::entity_t entityId);
-flecs::entity_t DecodeEntityUserData(void *userData);
-void AttachEntityUserData(const PhysicsBody &physicsBody, flecs::entity_t entityId);
-flecs::entity_t GetEntityFromShape(b2ShapeId shapeId);
+void CreateDynamicCircle(flecs::entity entity, Vector2 position, Vector2 center, float radius);
+void CreateStaticCollision(
+    flecs::entity entity,
+    StaticCollisionShape shape,
+    Rectangle worldBounds,
+    std::span<const Vector2> worldPoints = {},
+    float rotationDegrees = 0.0f);
+void CreateBoxSensor(flecs::entity entity, Rectangle worldBounds);
+void DestroyBody(flecs::entity entity);
 
-void DebugDraw();
+void Relocate(const PhysicsBody &body, Vector2 position, bool clearVelocity = false);
+void SetCircleCenter(const PhysicsBody &body, Vector2 center);
+
+std::span<const SensorEvent> SensorEvents(flecs::world world);
+void DebugDraw(flecs::world world);
 
 } // namespace Physics

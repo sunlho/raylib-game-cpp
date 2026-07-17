@@ -1,8 +1,4 @@
 #include <algorithm>
-#include <cmath>
-#include <utility>
-
-#include "box2d/box2d.h"
 
 #include "Tilemap.h"
 #include "TilemapInternal.h"
@@ -11,87 +7,20 @@
 namespace Tilemap {
 namespace {
 
-std::vector<b2Vec2> BuildRelativePoints(const std::vector<Vector2> &points, const Vector2 &origin) {
-  std::vector<b2Vec2> result;
-  result.reserve(points.size());
-
-  for (const auto &point : points) {
-    result.push_back(b2Vec2{point.x - origin.x, point.y - origin.y});
-  }
-
-  return result;
-}
-
-std::vector<b2Vec2> BuildEllipsePoints(const Rectangle &worldRect) {
-  constexpr int segments = 16;
-  std::vector<b2Vec2> points;
-  points.reserve(segments);
-
-  for (int i = 0; i < segments; ++i) {
-    const float angle = static_cast<float>(i) / static_cast<float>(segments) * 2.0f * PI;
-    points.push_back(b2Vec2{
-        std::cos(angle) * (worldRect.width * 0.5f),
-        std::sin(angle) * (worldRect.height * 0.5f)});
-  }
-
-  return points;
-}
-
-b2BodyId CreatePhysicsBody(const Tilemap::CollisionData &data, const b2WorldId &physicsWorld) {
-  b2BodyDef bodyDef = b2DefaultBodyDef();
-  bodyDef.type = b2_staticBody;
-  bodyDef.position = b2Vec2{data.worldRect.x + (data.worldRect.width * 0.5f), data.worldRect.y + (data.worldRect.height * 0.5f)};
-  bodyDef.rotation = b2MakeRot(data.rotation * DEG2RAD);
-
-  b2BodyId bodyId = b2CreateBody(physicsWorld, &bodyDef);
-  b2ShapeDef shapeDef = b2DefaultShapeDef();
-
-  switch (data.shape) {
+Physics::StaticCollisionShape ToPhysicsShape(Tilemap::CollisionShape shape) {
+  switch (shape) {
+  case Tilemap::CollisionShape::Ellipse:
+    return Physics::StaticCollisionShape::Ellipse;
+  case Tilemap::CollisionShape::Polygon:
+    return Physics::StaticCollisionShape::Polygon;
+  case Tilemap::CollisionShape::Polyline:
+    return Physics::StaticCollisionShape::Polyline;
   case Tilemap::CollisionShape::Rectangle:
   case Tilemap::CollisionShape::Point:
-  case Tilemap::CollisionShape::Text: {
-    const b2Polygon box = b2MakeBox(std::max(data.worldRect.width * 0.5f, 0.5f), std::max(data.worldRect.height * 0.5f, 0.5f));
-    b2CreatePolygonShape(bodyId, &shapeDef, &box);
-    break;
-  }
-  case Tilemap::CollisionShape::Ellipse: {
-    const auto points = BuildEllipsePoints(data.worldRect);
-    b2ChainDef chainDef = b2DefaultChainDef();
-    chainDef.points = points.data();
-    chainDef.count = static_cast<int>(points.size());
-    chainDef.isLoop = true;
-    b2CreateChain(bodyId, &chainDef);
-    break;
-  }
-  case Tilemap::CollisionShape::Polygon: {
-    const Vector2 center = {data.worldRect.x + (data.worldRect.width * 0.5f), data.worldRect.y + (data.worldRect.height * 0.5f)};
-    const auto points = BuildRelativePoints(data.worldPoints, center);
-    if (!points.empty()) {
-      b2ChainDef chainDef = b2DefaultChainDef();
-      chainDef.points = points.data();
-      chainDef.count = static_cast<int>(points.size());
-      chainDef.isLoop = true;
-      b2CreateChain(bodyId, &chainDef);
-    }
-    break;
-  }
-  case Tilemap::CollisionShape::Polyline: {
-    const Vector2 center = {data.worldRect.x + (data.worldRect.width * 0.5f), data.worldRect.y + (data.worldRect.height * 0.5f)};
-    const auto points = BuildRelativePoints(data.worldPoints, center);
-    if (!points.empty()) {
-      b2ChainDef chainDef = b2DefaultChainDef();
-      chainDef.points = points.data();
-      chainDef.count = static_cast<int>(points.size());
-      chainDef.isLoop = false;
-      b2CreateChain(bodyId, &chainDef);
-    }
-    break;
-  }
+  case Tilemap::CollisionShape::Text:
   default:
-    break;
+    return Physics::StaticCollisionShape::Box;
   }
-
-  return bodyId;
 }
 
 Rectangle BuildWorldRect(const Tilemap::CollisionData &collision, const Rectangle &tileRect) {
@@ -153,19 +82,23 @@ Tilemap::CollisionData BuildCollisionEntityData(const Tilemap::CollisionData &co
 
 } // namespace
 
-void CreateCollisionEntity(flecs::world &world, b2WorldId physicsWorld, const std::vector<Tilemap::CollisionData> &collisions, const Rectangle &tileRect, int layerIndex, flecs::entity layerGroup) {
+void CreateCollisionEntity(flecs::world &world, const std::vector<Tilemap::CollisionData> &collisions, const Rectangle &tileRect, int layerIndex, flecs::entity layerGroup) {
 
   for (const auto &collision : collisions) {
-    auto collisionEntity = world.entity().add<Tilemap::CollisionData>().add<Physics::PhysicsBody>();
+    auto collisionEntity = world.entity().add<Tilemap::CollisionData>();
 
     if (layerGroup.is_valid()) {
       collisionEntity.add(flecs::ChildOf, layerGroup);
     }
 
     const auto collisionData = BuildCollisionEntityData(collision, tileRect, layerIndex);
-    const b2BodyId bodyId = CreatePhysicsBody(collisionData, physicsWorld);
-    collisionEntity.set<Physics::PhysicsBody>({bodyId});
-    collisionEntity.set<Tilemap::CollisionData>(BuildCollisionEntityData(collision, tileRect, layerIndex));
+    collisionEntity.set<Tilemap::CollisionData>(collisionData);
+    Physics::CreateStaticCollision(
+        collisionEntity,
+        ToPhysicsShape(collisionData.shape),
+        collisionData.worldRect,
+        collisionData.worldPoints,
+        collisionData.rotation);
   }
 }
 
