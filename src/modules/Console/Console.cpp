@@ -1,4 +1,3 @@
-#include "Console.h"
 
 #include <algorithm>
 #include <cctype>
@@ -8,6 +7,7 @@
 #include "raylib.h"
 #include "rlImGui.h"
 
+#include "Console.h"
 #include "ConsoleInternal.h"
 
 namespace GameConsole {

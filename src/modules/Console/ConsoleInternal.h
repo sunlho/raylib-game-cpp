@@ -8,7 +8,8 @@
 
 #include "Console.h"
 
-namespace GameConsole::Internal {
+namespace GameConsole {
+namespace Internal {
 
 constexpr size_t MAX_INPUT_LENGTH = 256;
 constexpr size_t MAX_LOG_LINES = 200;
@@ -51,4 +52,6 @@ bool IsImGuiInitialized();
 void InitializeImGui();
 void ShutdownImGui();
 
-} // namespace GameConsole::Internal
+} // namespace Internal
+
+} // namespace GameConsole

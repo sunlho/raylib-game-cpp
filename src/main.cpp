@@ -132,16 +132,22 @@ int main() {
   Rendering::RunLoadingSequence(
       world,
       {
-          {0.7f,
-           "Loading map...",
-           [](flecs::world &loadingWorld) {
-             MapManager::SetMapPath(loadingWorld, "Map.tmx");
-           }},
-          {1.0f, "Loading character...", [characterUpdate, &accumulator](flecs::world &loadingWorld) {
-             CreatePlayer(loadingWorld);
-             ecs_run_pipeline(loadingWorld, characterUpdate, 0.0f);
-             accumulator = 0.0f;
-           }},
+          {
+              0.7f,
+              "Loading map...",
+              [](flecs::world &loadingWorld) {
+                MapManager::SetMapPath(loadingWorld, "Map.tmx");
+              },
+          },
+          {
+              1.0f,
+              "Loading character...",
+              [characterUpdate, &accumulator](flecs::world &loadingWorld) {
+                CreatePlayer(loadingWorld);
+                ecs_run_pipeline(loadingWorld, characterUpdate, 0.0f);
+                accumulator = 0.0f;
+              },
+          },
       },
       "Preparing resources...");
 

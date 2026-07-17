@@ -1,25 +1,22 @@
-#include "Console.h"
-
 #include <algorithm>
 #include <string>
 
 #include "imgui.h"
 #include "rlImGui.h"
 
+#include "Console.h"
 #include "ConsoleInternal.h"
 
 namespace GameConsole {
-namespace {
+namespace Internal {
 
-using Internal::ConsoleState;
-
-ImVec4 GetLineColor(Internal::LineKind kind) {
+ImVec4 GetLineColor(LineKind kind) {
   switch (kind) {
-  case Internal::LineKind::Error:
+  case LineKind::Error:
     return ImVec4(0.94f, 0.43f, 0.43f, 1.0f);
-  case Internal::LineKind::Command:
+  case LineKind::Command:
     return ImVec4(0.42f, 0.83f, 0.70f, 1.0f);
-  case Internal::LineKind::Output:
+  case LineKind::Output:
   default:
     return ImVec4(0.86f, 0.88f, 0.90f, 1.0f);
   }
@@ -35,7 +32,7 @@ int InputCallback(ImGuiInputTextCallbackData *data) {
   auto &state = *static_cast<ConsoleState *>(data->UserData);
 
   if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion) {
-    const auto suggestions = Internal::GetSuggestions(state);
+    const auto suggestions = GetSuggestions(state);
     if (!suggestions.empty()) {
       const bool slashPrefixed = state.input.front() == '/';
       std::string completed = slashPrefixed ? "/" : "";
@@ -69,15 +66,15 @@ int InputCallback(ImGuiInputTextCallbackData *data) {
   }
 
   selected = state.historyIndex >= 0
-      ? state.history[static_cast<size_t>(state.historyIndex)]
-      : state.historyDraft;
+                 ? state.history[static_cast<size_t>(state.historyIndex)]
+                 : state.historyDraft;
   ReplaceInput(data, selected);
   return 0;
 }
 
 void DrawSuggestions(ConsoleState &state) {
   constexpr int MAX_SUGGESTIONS = 4;
-  const auto suggestions = Internal::GetSuggestions(state);
+  const auto suggestions = GetSuggestions(state);
 
   ImGui::BeginChild("Suggestions", ImVec2(0.0f, 76.0f), ImGuiChildFlags_Borders);
   if (suggestions.empty()) {
@@ -86,7 +83,7 @@ void DrawSuggestions(ConsoleState &state) {
     const int count = std::min(MAX_SUGGESTIONS, static_cast<int>(suggestions.size()));
     for (int index = 0; index < count; ++index) {
       const CommandDefinition &command = *suggestions[static_cast<size_t>(index)];
-      const std::string label = Internal::FormatCommand(command);
+      const std::string label = FormatCommand(command);
       if (ImGui::Selectable(label.c_str(), false, ImGuiSelectableFlags_AllowDoubleClick)) {
         const bool slashPrefixed = state.input.front() == '/';
         std::string completed = slashPrefixed ? "/" : "";
@@ -94,7 +91,7 @@ void DrawSuggestions(ConsoleState &state) {
         if (!command.usage.empty()) {
           completed.push_back(' ');
         }
-        Internal::SetInput(state, completed);
+        SetInput(state, completed);
         state.requestFocus = true;
       }
       if (ImGui::IsItemHovered()) {
@@ -126,7 +123,7 @@ void DrawWindow(flecs::world &world, ConsoleState &state) {
   }
 
   if (ImGui::Button("Clear")) {
-    Internal::ClearLines(state);
+    ClearLines(state);
   }
   ImGui::SameLine();
   ImGui::TextDisabled("%zu commands", state.commands.size());
@@ -169,7 +166,7 @@ void DrawWindow(flecs::world &world, ConsoleState &state) {
           inputFlags,
           InputCallback,
           &state)) {
-    Internal::Execute(world);
+    Execute(world);
     state.requestFocus = true;
   }
 
@@ -177,7 +174,7 @@ void DrawWindow(flecs::world &world, ConsoleState &state) {
   state.open = visible;
 }
 
-} // namespace
+} // namespace Internal
 
 void Draw(flecs::world &world) {
   if (!Internal::IsImGuiInitialized()) {
@@ -191,7 +188,7 @@ void Draw(flecs::world &world) {
     state.clearQueuedInput = false;
   }
   if (state.open) {
-    DrawWindow(world, state);
+    Internal::DrawWindow(world, state);
   }
   rlImGuiEnd();
 }
