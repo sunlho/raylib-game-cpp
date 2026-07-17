@@ -7,7 +7,6 @@ namespace Physics {
 
 typedef struct PhysicsWorld {
   b2WorldId id;
-  float timeStep;
 } PhysicsWorld;
 
 typedef struct PhysicsBody {

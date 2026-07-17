@@ -49,9 +49,12 @@ struct RenderableSortData {
   const Rendering::RenderComponent *renderComponent;
 };
 
-// True when the active map has no drawable chunk data yet.
-bool HasNoChunkData(const ActiveMapData &activeData) {
+bool HasNoStaticChunkData(const ActiveMapData &activeData) {
   return !activeData.textureBank || activeData.staticTiles.empty() || activeData.chunkPixelWidth <= 0 || activeData.chunkPixelHeight <= 0;
+}
+
+bool HasNoSortableChunkData(const ActiveMapData &activeData) {
+  return !activeData.textureBank || activeData.sortableTiles.empty() || activeData.chunkPixelWidth <= 0 || activeData.chunkPixelHeight <= 0;
 }
 
 // Computes the chunk the camera is centred on.
@@ -70,7 +73,7 @@ void RegisterMapRendering(flecs::world &world) {
         auto world = it.world();
         const auto &activeData = world.get<ActiveMapData>();
 
-        if (HasNoChunkData(activeData)) {
+        if (HasNoStaticChunkData(activeData)) {
           return;
         }
 
@@ -110,17 +113,10 @@ void RegisterMapRendering(flecs::world &world) {
 
   world.system<const Rendering::Position, const Rendering::RenderComponent>("Draw Sort Chunks")
       .with<const Rendering::SortableTag>()
-      .kind<Rendering::Phases::Draw>()
+      .kind<Rendering::Phases::SortedWorld>()
       .run([](flecs::iter &it) {
         auto world = it.world();
         const auto &activeData = world.get<ActiveMapData>();
-
-        if (HasNoChunkData(activeData)) {
-          return;
-        }
-
-        const auto &mainCamera = world.get<GameCamera::MainCamera>();
-        const ChunkKey center = CameraCenterChunk(activeData, mainCamera);
 
         std::vector<RenderableSortData> sortData;
 
@@ -136,12 +132,19 @@ void RegisterMapRendering(flecs::world &world) {
         }
 
         std::size_t tileCount = 0;
-        for (int dx = -1; dx <= 1; ++dx) {
-          for (int dy = -1; dy <= 1; ++dy) {
-            ChunkKey key{center.x + dx, center.y + dy};
-            auto keyIt = activeData.sortableTiles.find(key);
-            if (keyIt != activeData.sortableTiles.end()) {
-              tileCount += keyIt->second.size();
+        ChunkKey center{};
+        const bool hasSortableChunks = !HasNoSortableChunkData(activeData);
+        if (hasSortableChunks) {
+          const auto &mainCamera = world.get<GameCamera::MainCamera>();
+          center = CameraCenterChunk(activeData, mainCamera);
+
+          for (int dx = -1; dx <= 1; ++dx) {
+            for (int dy = -1; dy <= 1; ++dy) {
+              ChunkKey key{center.x + dx, center.y + dy};
+              auto keyIt = activeData.sortableTiles.find(key);
+              if (keyIt != activeData.sortableTiles.end()) {
+                tileCount += keyIt->second.size();
+              }
             }
           }
         }
@@ -150,28 +153,30 @@ void RegisterMapRendering(flecs::world &world) {
         std::vector<Rendering::Position> tilePositions;
         tilePositions.reserve(tileCount);
 
-        for (int dx = -1; dx <= 1; ++dx) {
-          for (int dy = -1; dy <= 1; ++dy) {
-            int chunkX = center.x + dx;
-            int chunkY = center.y + dy;
+        if (hasSortableChunks) {
+          for (int dx = -1; dx <= 1; ++dx) {
+            for (int dy = -1; dy <= 1; ++dy) {
+              int chunkX = center.x + dx;
+              int chunkY = center.y + dy;
 
-            ChunkKey key{chunkX, chunkY};
-            auto keyIt = activeData.sortableTiles.find(key);
-            if (keyIt == activeData.sortableTiles.end()) {
-              continue;
-            }
-
-            for (const auto &renderComponent : keyIt->second) {
-              if (!renderComponent.object || !renderComponent.visible) {
+              ChunkKey key{chunkX, chunkY};
+              auto keyIt = activeData.sortableTiles.find(key);
+              if (keyIt == activeData.sortableTiles.end()) {
                 continue;
               }
 
-              Rendering::Position position;
-              position.value.x = static_cast<float>(chunkX * activeData.chunkPixelWidth);
-              position.value.y = static_cast<float>(chunkY * activeData.chunkPixelHeight);
-              tilePositions.push_back(position);
+              for (const auto &renderComponent : keyIt->second) {
+                if (!renderComponent.object || !renderComponent.visible) {
+                  continue;
+                }
 
-              sortData.push_back(RenderableSortData{&tilePositions.back(), &renderComponent});
+                Rendering::Position position;
+                position.value.x = static_cast<float>(chunkX * activeData.chunkPixelWidth);
+                position.value.y = static_cast<float>(chunkY * activeData.chunkPixelHeight);
+                tilePositions.push_back(position);
+
+                sortData.push_back(RenderableSortData{&tilePositions.back(), &renderComponent});
+              }
             }
           }
         }

@@ -5,11 +5,6 @@
 
 namespace GameCamera {
 
-struct Phases {
-  struct Begin2D {};
-  struct End2D {};
-};
-
 struct MainCamera {
   Camera2D value = {
       Vector2{0.0f, 0.0f},
@@ -22,6 +17,9 @@ struct MainCamera {
   float followSpeed = 6.0f;
   bool snapTargetToPixel = true;
 };
+
+void Begin2D(flecs::world &world);
+void End2D(const flecs::world &world);
 
 struct module {
   module(flecs::world &world);

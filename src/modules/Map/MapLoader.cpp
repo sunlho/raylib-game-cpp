@@ -2,6 +2,7 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include "Map.h"
@@ -101,6 +102,26 @@ void BuildChunkEntities(flecs::world &world, const Tilemap::LoadedMap &loadedMap
   }
 }
 
+void PreloadMapTextures(Tilemap::LoadedMap &loadedMap) {
+  if (!loadedMap.textureBank) {
+    return;
+  }
+
+  std::unordered_set<std::string> texturePaths;
+  for (const auto &chunk : loadedMap.chunks) {
+    for (const auto &tile : chunk.tiles) {
+      const auto *tileObject = loadedMap.textureBank->getTile(tile.tileGid);
+      if (tileObject && !tileObject->texturePath.empty()) {
+        texturePaths.insert(tileObject->texturePath);
+      }
+    }
+  }
+
+  for (const auto &path : texturePaths) {
+    loadedMap.textureBank->getOrLoadTexture(path);
+  }
+}
+
 void LoadMapFromPath(flecs::world world, const MapPath &mapPath) {
   auto &mapState = world.get_mut<MapState>();
   if (mapState.currentPath == mapPath.value && mapState.mapRoot.is_valid()) {
@@ -112,6 +133,8 @@ void LoadMapFromPath(flecs::world world, const MapPath &mapPath) {
   if (!loadedMap) {
     return;
   }
+
+  PreloadMapTextures(*loadedMap);
 
   DestroyCurrentMap(mapState);
   ClearMapData(world);

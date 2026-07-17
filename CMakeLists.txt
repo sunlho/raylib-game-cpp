@@ -9,11 +9,10 @@ include(FetchContent)
 
 find_package(raylib REQUIRED)
 find_package(flecs REQUIRED)
+find_package(box2d REQUIRED)
 find_package(tmxlite REQUIRED)
 find_package(WebP REQUIRED)
 find_package(pfr REQUIRED)
-find_package(box2d REQUIRED)
-find_package(glfw3 REQUIRED)
 find_package(imgui REQUIRED)
 
 FetchContent_Declare(
@@ -23,9 +22,18 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(rlimgui)
 
+add_library(rlimgui STATIC
+    ${rlimgui_SOURCE_DIR}/rlImGui.cpp
+)
+target_include_directories(rlimgui PUBLIC ${rlimgui_SOURCE_DIR})
+target_link_libraries(rlimgui PUBLIC raylib imgui::imgui)
+
 add_executable(${PROJECT_NAME}
     src/main.cpp
     src/modules/Camera.cpp
+    src/modules/Console/Console.cpp
+    src/modules/Console/ConsoleUI.cpp
+    src/modules/Console/Register.cpp
     src/modules/Movement.cpp
     src/modules/Rendering.cpp
     src/modules/Physics.cpp
@@ -53,7 +61,7 @@ add_executable(${PROJECT_NAME}
 )
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE raylib flecs::flecs_static box2d::box2d tmxlite::tmxlite libwebp::libwebp pfr::pfr imgui::imgui rlImGui)
+target_link_libraries(${PROJECT_NAME} PRIVATE raylib flecs::flecs_static box2d::box2d tmxlite::tmxlite libwebp::libwebp pfr::pfr imgui::imgui rlimgui)
 
 if(MSVC)
     target_link_options(${PROJECT_NAME} PRIVATE /ignore:4099)

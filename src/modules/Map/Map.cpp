@@ -1,4 +1,5 @@
 #include <string>
+#include <utility>
 
 #include "Map.h"
 #include "MapInternal.h"
@@ -31,6 +32,14 @@ module::module(flecs::world &world) {
 void SetMapPath(flecs::world &world, const std::string &path) {
   auto mapEntity = world.entity("Map");
   mapEntity.set<MapPath>(MapPath{path});
+}
+
+bool TransitionToMap(flecs::world &world, std::string path, std::string hint) {
+  return Rendering::RunLoadingSequence(
+      world,
+      {{1.0f, hint, [path = std::move(path)](flecs::world &loadingWorld) {
+          SetMapPath(loadingWorld, path);
+        }}});
 }
 
 } // namespace MapManager

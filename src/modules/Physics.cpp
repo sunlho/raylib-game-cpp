@@ -75,13 +75,13 @@ module::module(flecs::world &world) {
 
     world.entity("Box2d World")
         .add<PhysicsWorld>()
-        .set<PhysicsWorld>({worldId, 1.0f / 60.0f});
+        .set<PhysicsWorld>({worldId});
   }
 
-  world.system<const PhysicsWorld>("Fixed Update")
-      .kind<Simulation::FixedUpdate>()
+  world.system<const PhysicsWorld>("Step Physics World")
+      .kind<Simulation::PhysicsStep>()
       .each([](flecs::iter &it, size_t i, const PhysicsWorld &world) {
-        b2World_Step(world.id, world.timeStep, 2);
+        b2World_Step(world.id, it.delta_time(), 2);
       });
 
   world.observer<PhysicsBody>("Destroy Body Observer")

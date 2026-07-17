@@ -4,6 +4,9 @@
 namespace Simulation {
 
 struct PreUpdate {};
+struct PrePhysics {};
+struct PhysicsStep {};
+struct PostPhysics {};
 struct FixedUpdate {};
 struct PostUpdate {};
 

@@ -48,6 +48,7 @@ struct ActiveMapData {
 };
 
 void SetMapPath(flecs::world &world, const std::string &path);
+bool TransitionToMap(flecs::world &world, std::string path, std::string hint = "Loading map...");
 
 struct module {
   module(flecs::world &world);

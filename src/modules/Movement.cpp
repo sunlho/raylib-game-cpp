@@ -8,6 +8,7 @@
 
 #include "Camera.h"
 #include "Character/Character.h"
+#include "Console/Console.h"
 #include "Movement.h"
 #include "Physics.h"
 #include "Reflection.h"
@@ -41,7 +42,12 @@ module::module(flecs::world &world) {
   world.system<Velocity, const MoveSpeed>("Update Player Input")
       .kind<Movement::Phases::Update>()
       .with<PlayerControlled>()
-      .each([](Velocity &velocity, const MoveSpeed &speed) {
+      .each([](flecs::iter &it, size_t, Velocity &velocity, const MoveSpeed &speed) {
+        if (GameConsole::IsOpen(it.world())) {
+          velocity.value = Vector2{0.0f, 0.0f};
+          return;
+        }
+
         Vector2 direction = {
             static_cast<float>(IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) -
                 static_cast<float>(IsKeyDown(KEY_A) || IsKeyDown(KEY_LEFT)),
@@ -55,25 +61,47 @@ module::module(flecs::world &world) {
         velocity.value = Vector2Scale(direction, speed.value);
       });
 
-  // TODO: The physics position is not clamped to the map bounds
-  world.system<Rendering::Position, const Velocity, const Physics::PhysicsBody>("Move Entities")
-      .kind<Simulation::FixedUpdate>()
-      .each([](flecs::iter &it, size_t i, Rendering::Position &position, const Velocity &velocity, const Physics::PhysicsBody &physicsBody) {
-        const float deltaTime = it.delta_time();
+  world.system<const Velocity, const Physics::PhysicsBody>("Apply Entity Velocity")
+      .kind<Simulation::PrePhysics>()
+      .each([](const Velocity &velocity, const Physics::PhysicsBody &physicsBody) {
+        if (!b2Body_IsValid(physicsBody.id)) {
+          return;
+        }
+
         b2Body_SetLinearVelocity(physicsBody.id, b2Vec2{velocity.value.x, velocity.value.y});
+      });
+
+  world.system<Rendering::Position, const Physics::PhysicsBody>("Sync Physics Positions")
+      .kind<Simulation::PostPhysics>()
+      .each([](Rendering::Position &position, const Physics::PhysicsBody &physicsBody) {
+        if (!b2Body_IsValid(physicsBody.id)) {
+          return;
+        }
+
         b2Vec2 bodyPosition = b2Body_GetPosition(physicsBody.id);
         position.value = Vector2{bodyPosition.x, bodyPosition.y};
       });
 
-  world.system<Rendering::Position, const Character::SpriteSet, const Character::AnimationController, Rendering::RenderComponent>("Clamp Player To Map Bounds")
+  world.system<Rendering::Position, const Character::SpriteSet, const Character::AnimationController, Rendering::RenderComponent, const Physics::PhysicsBody>("Clamp Player To Map Bounds")
       .kind<Simulation::FixedUpdate>()
       .with<PlayerControlled>()
-      .each([](flecs::iter &it, size_t, Rendering::Position &position, const Character::SpriteSet &spriteSet, const Character::AnimationController &controller, Rendering::RenderComponent &renderComponent) {
+      .each([](flecs::iter &it, size_t, Rendering::Position &position, const Character::SpriteSet &spriteSet, const Character::AnimationController &controller, Rendering::RenderComponent &renderComponent, const Physics::PhysicsBody &physicsBody) {
         const auto &mapBounds = it.world().get<Tilemap::MapBounds>();
         const Vector2 halfExtents = Character::GetSpriteHalfExtents(spriteSet, controller);
 
-        position.value.x = ClampAxisToBounds(position.value.x, halfExtents.x, mapBounds.dimension.x);
-        position.value.y = ClampAxisToBounds(position.value.y, halfExtents.y, mapBounds.dimension.y);
+        const Vector2 clampedPosition = {
+            ClampAxisToBounds(position.value.x, halfExtents.x, mapBounds.dimension.x),
+            ClampAxisToBounds(position.value.y, halfExtents.y, mapBounds.dimension.y)};
+
+        if ((clampedPosition.x != position.value.x || clampedPosition.y != position.value.y) &&
+            b2Body_IsValid(physicsBody.id)) {
+          b2Body_SetTransform(
+              physicsBody.id,
+              b2Vec2{clampedPosition.x, clampedPosition.y},
+              b2Body_GetRotation(physicsBody.id));
+        }
+
+        position.value = clampedPosition;
 
         renderComponent.sortY = position.value.y + halfExtents.y;
       });
