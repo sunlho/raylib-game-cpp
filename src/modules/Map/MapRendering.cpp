@@ -45,8 +45,12 @@ void TileRenderable::Draw(const Rendering::Position &position) const {
 namespace {
 
 struct RenderableSortData {
-  const Rendering::Position *position;
+  Rendering::Position position;
   const Rendering::RenderComponent *renderComponent;
+};
+
+struct MapRenderScratch {
+  std::vector<RenderableSortData> sortData;
 };
 
 bool HasNoStaticChunkData(const ActiveMapData &activeData) {
@@ -67,6 +71,8 @@ ChunkKey CameraCenterChunk(const ActiveMapData &activeData, const GameCamera::Ma
 } // namespace
 
 void RegisterMapRendering(flecs::world &world) {
+  auto sortScratch = std::make_shared<MapRenderScratch>();
+
   world.system("Draw Static Chunks")
       .kind<Rendering::Phases::Background>()
       .run([](flecs::iter &it) {
@@ -94,13 +100,13 @@ void RegisterMapRendering(flecs::world &world) {
                 continue;
               }
 
-              Texture2D textureToUse = activeData.textureBank->getOrLoadTexture(tileObject->texturePath);
-              if (textureToUse.id == 0) {
+              const Texture2D *texture = activeData.textureBank->getTexture(tileObject->texturePath);
+              if (!texture) {
                 continue;
               }
 
               DrawTexturePro(
-                  textureToUse,
+                  *texture,
                   tile.srcRect,
                   tile.destRect,
                   Vector2{0.0f, 0.0f},
@@ -114,20 +120,18 @@ void RegisterMapRendering(flecs::world &world) {
   world.system<const Rendering::Position, const Rendering::RenderComponent>("Draw Sort Chunks")
       .with<const Rendering::SortableTag>()
       .kind<Rendering::Phases::SortedWorld>()
-      .run([](flecs::iter &it) {
+      .run([sortScratch = std::move(sortScratch)](flecs::iter &it) {
         auto world = it.world();
         const auto &activeData = world.get<ActiveMapData>();
+        auto &sortData = sortScratch->sortData;
+        sortData.clear();
 
-        std::vector<RenderableSortData> sortData;
-
-        std::size_t entityCount = 0;
         while (it.next()) {
-          entityCount += it.count();
           auto position = it.field<const Rendering::Position>(0);
           auto renderComponent = it.field<const Rendering::RenderComponent>(1);
 
           for (auto i : it) {
-            sortData.push_back(RenderableSortData{&position[i], &renderComponent[i]});
+            sortData.push_back(RenderableSortData{position[i], &renderComponent[i]});
           }
         }
 
@@ -148,10 +152,7 @@ void RegisterMapRendering(flecs::world &world) {
             }
           }
         }
-        sortData.reserve(entityCount + tileCount);
-
-        std::vector<Rendering::Position> tilePositions;
-        tilePositions.reserve(tileCount);
+        sortData.reserve(sortData.size() + tileCount);
 
         if (hasSortableChunks) {
           for (int dx = -1; dx <= 1; ++dx) {
@@ -173,9 +174,7 @@ void RegisterMapRendering(flecs::world &world) {
                 Rendering::Position position;
                 position.value.x = static_cast<float>(chunkX * activeData.chunkPixelWidth);
                 position.value.y = static_cast<float>(chunkY * activeData.chunkPixelHeight);
-                tilePositions.push_back(position);
-
-                sortData.push_back(RenderableSortData{&tilePositions.back(), &renderComponent});
+                sortData.push_back(RenderableSortData{position, &renderComponent});
               }
             }
           }
@@ -194,7 +193,7 @@ void RegisterMapRendering(flecs::world &world) {
             continue;
           }
 
-          data.renderComponent->object->Draw(*data.position);
+          data.renderComponent->object->Draw(data.position);
         }
       });
 }

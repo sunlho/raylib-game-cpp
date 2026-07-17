@@ -10,9 +10,9 @@
 namespace MapManager {
 
 module::module(flecs::world &world) {
-  Reflection::Register<Tilemap::MapBounds>(world)
+  Reflection::Register<MapBounds>(world)
       .add(flecs::Singleton)
-      .set<Tilemap::MapBounds>({});
+      .set<MapBounds>({});
   Reflection::Register<Tilemap::CollisionData>(world);
   Reflection::Register<MapPath>(world);
   Reflection::Register<ActiveMapData>(world)

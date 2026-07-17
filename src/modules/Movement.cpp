@@ -10,11 +10,11 @@
 #include "Character/Character.h"
 #include "Console/Console.h"
 #include "Movement.h"
+#include "Map/Map.h"
 #include "Physics.h"
 #include "Reflection.h"
 #include "Rendering.h"
 #include "Simulation.h"
-#include "Tilemap/Tilemap.h"
 
 namespace Movement {
 namespace {
@@ -86,7 +86,7 @@ module::module(flecs::world &world) {
       .kind<Simulation::FixedUpdate>()
       .with<PlayerControlled>()
       .each([](flecs::iter &it, size_t, Rendering::Position &position, const Character::SpriteSet &spriteSet, const Character::AnimationController &controller, Rendering::RenderComponent &renderComponent, const Physics::PhysicsBody &physicsBody) {
-        const auto &mapBounds = it.world().get<Tilemap::MapBounds>();
+        const auto &mapBounds = it.world().get<MapManager::MapBounds>();
         const Vector2 halfExtents = Character::GetSpriteHalfExtents(spriteSet, controller);
 
         const Vector2 clampedPosition = {
@@ -112,7 +112,7 @@ module::module(flecs::world &world) {
       .each([](flecs::iter &it, size_t i, const Rendering::Position &position) {
         auto world = it.world();
         auto &mainCamera = world.get_mut<GameCamera::MainCamera>();
-        const auto mapBounds = world.get<Tilemap::MapBounds>();
+        const auto mapBounds = world.get<MapManager::MapBounds>();
         const auto renderTargetSize = world.get<Rendering::RenderTargetSize>();
         const bool snapTargetToPixel = mainCamera.snapTargetToPixel;
 

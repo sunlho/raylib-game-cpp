@@ -17,10 +17,6 @@ namespace Tilemap {
 
 static constexpr int CHUNK_SIZE = 16;
 
-struct MapBounds {
-  Vector2 dimension = {0.0f, 0.0f};
-};
-
 struct ChunkTile {
   std::uint32_t tileGid = 0;
   Rectangle srcRect = {0};
@@ -103,7 +99,7 @@ struct TilemapTextureBank {
 };
 
 struct LoadedMap {
-  MapBounds bounds = {};
+  Vector2 dimensions = {0.0f, 0.0f};
   std::shared_ptr<TilemapTextureBank> textureBank;
   std::vector<Chunk> chunks;
   std::vector<Stairs::StairData> stairs;

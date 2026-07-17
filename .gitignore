@@ -408,3 +408,4 @@ CMakeUserPresets.json
 !src/modules/Debug/
 
 .agents/
+AGENTS.md

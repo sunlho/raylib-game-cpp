@@ -135,6 +135,42 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
   RegisterCommand(
       world,
       {
+          "resolution",
+          "<1-4>",
+          "Set window size (1: 1280x720, 2: 1600x900, 3: 1920x1080, 4: 2560x1440)",
+          [](flecs::world &, const std::vector<std::string> &arguments) {
+            if (arguments.size() != 1) {
+              return CommandResult{false, "Usage: resolution <1-4> (1: 1280x720, 2: 1600x900, 3: 1920x1080, 4: 2560x1440)"};
+            }
+
+            int width = 0;
+            int height = 0;
+            if (arguments.front() == "1") {
+              width = 1280;
+              height = 720;
+            } else if (arguments.front() == "2") {
+              width = 1600;
+              height = 900;
+            } else if (arguments.front() == "3") {
+              width = 1920;
+              height = 1080;
+            } else if (arguments.front() == "4") {
+              width = 2560;
+              height = 1440;
+            } else {
+              return CommandResult{false, "Usage: resolution <1-4> (1: 1280x720, 2: 1600x900, 3: 1920x1080, 4: 2560x1440)"};
+            }
+
+            SetWindowSize(width, height);
+            return CommandResult{
+                true,
+                "Window size set to " + std::to_string(width) + "x" + std::to_string(height)};
+          },
+      });
+
+  RegisterCommand(
+      world,
+      {
           "speed",
           "[value]",
           "Show or set player movement speed",

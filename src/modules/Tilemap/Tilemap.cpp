@@ -30,7 +30,7 @@ bool LoadFromPath(const std::string &path, LoadedMap &loadedMap) {
   loadedMap.tileHeight = mapTileSize.y;
   loadedMap.chunkPixelHeight = Tilemap::CHUNK_SIZE * mapTileSize.y;
   loadedMap.chunkPixelWidth = Tilemap::CHUNK_SIZE * mapTileSize.x;
-  loadedMap.bounds.dimension = Vector2{
+  loadedMap.dimensions = Vector2{
       static_cast<float>(mapTileCount.x) * static_cast<float>(mapTileSize.x),
       static_cast<float>(mapTileCount.y) * static_cast<float>(mapTileSize.y)};
 
