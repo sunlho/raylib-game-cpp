@@ -3,7 +3,7 @@
 
 #include "modules/Rendering.h"
 
-namespace Character {
+namespace Character::Internal {
 
 CharacterRenderable::CharacterRenderable(flecs::entity entity) : entity_(entity) {
 }
@@ -83,4 +83,4 @@ void RegisterCharacterRendering(flecs::world &world) {
       });
 }
 
-} // namespace Character
+} // namespace Character::Internal

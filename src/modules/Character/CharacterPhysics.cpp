@@ -3,7 +3,7 @@
 #include "modules/Physics.h"
 #include "modules/Rendering.h"
 
-namespace Character {
+namespace Character::Internal {
 
 void RegisterCharacterPhysics(flecs::world &world) {
   world.observer<const Rendering::Position>("Create Character Physics Observer")
@@ -23,4 +23,4 @@ void RegisterCharacterPhysics(flecs::world &world) {
       });
 }
 
-} // namespace Character
+} // namespace Character::Internal

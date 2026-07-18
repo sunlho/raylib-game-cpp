@@ -7,7 +7,7 @@
 
 #include "modules/Rendering.h"
 
-namespace Character {
+namespace Character::Internal {
 
 const char *DirectionSuffix(CharacterDirection direction);
 const char *StatePrefix(CharacterState state);
@@ -29,4 +29,4 @@ void RegisterCharacterSprites(flecs::world &world);
 void RegisterCharacterPhysics(flecs::world &world);
 void RegisterCharacterRendering(flecs::world &world);
 
-} // namespace Character
+} // namespace Character::Internal

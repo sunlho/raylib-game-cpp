@@ -11,7 +11,7 @@
 #include "Movement.h"
 #include "Physics.h"
 #include "Rendering.h"
-#include "Simulation.h"
+#include "Runtime/RuntimePhases.h"
 
 namespace Physics {
 namespace {
@@ -212,7 +212,7 @@ module::module(flecs::world &world) {
   world.set<PhysicsWorld>({b2CreateWorld(&worldDef), {}});
 
   world.system<const Movement::Velocity, const PhysicsBody>("Apply Entity Velocity")
-      .kind<Simulation::PrePhysics>()
+      .kind<Runtime::Phases::PrePhysics>()
       .each([](const Movement::Velocity &velocity, const PhysicsBody &body) {
         const b2BodyId bodyId = PhysicsAccess::BodyId(body);
         if (b2Body_IsValid(bodyId)) {
@@ -221,7 +221,7 @@ module::module(flecs::world &world) {
       });
 
   world.system("Step Physics World")
-      .kind<Simulation::PhysicsStep>()
+      .kind<Runtime::Phases::PhysicsStep>()
       .run([](flecs::iter &it) {
         auto &physicsWorld = GetWorld(it.world());
         if (!b2World_IsValid(physicsWorld.id)) {
@@ -234,7 +234,7 @@ module::module(flecs::world &world) {
       });
 
   world.system<Rendering::Position, const PhysicsBody>("Sync Physics Positions")
-      .kind<Simulation::PostPhysics>()
+      .kind<Runtime::Phases::PostPhysics>()
       .each([](Rendering::Position &position, const PhysicsBody &body) {
         const b2BodyId bodyId = PhysicsAccess::BodyId(body);
         if (!b2Body_IsValid(bodyId)) {

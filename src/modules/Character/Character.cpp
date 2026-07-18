@@ -18,10 +18,10 @@ module::module(flecs::world &world) {
   Reflection::Register<SpriteEntry>(world);
   Reflection::Register<SpriteSet>(world);
 
-  RegisterCharacterAnimation(world);
-  RegisterCharacterSprites(world);
-  RegisterCharacterPhysics(world);
-  RegisterCharacterRendering(world);
+  Internal::RegisterCharacterAnimation(world);
+  Internal::RegisterCharacterSprites(world);
+  Internal::RegisterCharacterPhysics(world);
+  Internal::RegisterCharacterRendering(world);
 }
 
 } // namespace Character

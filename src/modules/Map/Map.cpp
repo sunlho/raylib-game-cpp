@@ -14,24 +14,24 @@ module::module(flecs::world &world) {
       .add(flecs::Singleton)
       .set<MapBounds>({});
   Reflection::Register<Tilemap::CollisionData>(world);
-  Reflection::Register<MapPath>(world);
-  Reflection::Register<ActiveMapData>(world)
+  Reflection::Register<Internal::MapPath>(world);
+  Reflection::Register<Internal::ActiveMapData>(world)
       .add(flecs::Singleton)
-      .set<ActiveMapData>({});
-  Reflection::Register<MapCacheState>(world)
+      .set<Internal::ActiveMapData>({});
+  Reflection::Register<Internal::MapCacheState>(world)
       .add(flecs::Singleton)
-      .set<MapCacheState>({});
-  Reflection::Register<MapState>(world)
+      .set<Internal::MapCacheState>({});
+  Reflection::Register<Internal::MapState>(world)
       .add(flecs::Singleton)
-      .set<MapState>({});
+      .set<Internal::MapState>({});
 
-  RegisterMapRendering(world);
-  RegisterMapLoader(world);
+  Internal::RegisterMapRendering(world);
+  Internal::RegisterMapLoader(world);
 }
 
 void SetMapPath(flecs::world &world, const std::string &path) {
   auto mapEntity = world.entity("Map");
-  mapEntity.set<MapPath>(MapPath{path});
+  mapEntity.set<Internal::MapPath>(Internal::MapPath{path});
 }
 
 bool TransitionToMap(flecs::world &world, std::string path, std::string hint) {

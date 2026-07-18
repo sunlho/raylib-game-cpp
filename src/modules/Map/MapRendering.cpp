@@ -11,9 +11,10 @@
 
 #include "modules/Camera.h"
 #include "modules/Rendering.h"
+#include "modules/Runtime/RuntimePhases.h"
 #include "modules/Tilemap/Tilemap.h"
 
-namespace MapManager {
+namespace MapManager::Internal {
 
 TileRenderable::TileRenderable(std::shared_ptr<const Tilemap::TilemapTextureBank> bank, const Tilemap::ChunkTile &tile)
     : textureBank(std::move(bank)) {
@@ -74,7 +75,7 @@ void RegisterMapRendering(flecs::world &world) {
   auto sortScratch = std::make_shared<MapRenderScratch>();
 
   world.system("Draw Static Chunks")
-      .kind<Rendering::Phases::Background>()
+      .kind<Runtime::Phases::DrawBackground>()
       .run([](flecs::iter &it) {
         auto world = it.world();
         const auto &activeData = world.get<ActiveMapData>();
@@ -119,7 +120,7 @@ void RegisterMapRendering(flecs::world &world) {
 
   world.system<const Rendering::Position, const Rendering::RenderComponent>("Draw Sort Chunks")
       .with<const Rendering::SortableTag>()
-      .kind<Rendering::Phases::SortedWorld>()
+      .kind<Runtime::Phases::DrawSortedWorld>()
       .run([sortScratch = std::move(sortScratch)](flecs::iter &it) {
         auto world = it.world();
         const auto &activeData = world.get<ActiveMapData>();
@@ -198,4 +199,4 @@ void RegisterMapRendering(flecs::world &world) {
       });
 }
 
-} // namespace MapManager
+} // namespace MapManager::Internal

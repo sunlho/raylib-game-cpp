@@ -6,7 +6,7 @@
 #include "modules/Assets.h"
 
 namespace Tilemap {
-namespace TilemapInternal {
+namespace Internal {
 
 Rectangle ComputeSourceRect(const TilemapTileObject &tile, std::uint32_t gid) {
   return tile.srcRect;
@@ -90,7 +90,7 @@ std::shared_ptr<TilemapTextureBank> LoadTilesetTextures(const tmx::Map &tilemap,
   return textureBank;
 }
 
-} // namespace TilemapInternal
+} // namespace Internal
 
 Texture2D TilemapTextureBank::getOrLoadTexture(const std::string &path) {
   if (path.empty()) {

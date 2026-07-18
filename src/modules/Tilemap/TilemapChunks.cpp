@@ -8,8 +8,7 @@
 
 #include "modules/Stairs/Stairs.h"
 
-namespace Tilemap {
-namespace TilemapInternal {
+namespace Tilemap::Internal {
 
 int CeilDiv(int value, int divisor) {
   return (value + divisor - 1) / divisor;
@@ -258,5 +257,4 @@ void BuildObjectCollisions(const tmx::Map &tilemap, const tmx::ObjectGroup &obje
   }
 }
 
-} // namespace TilemapInternal
-} // namespace Tilemap
+} // namespace Tilemap::Internal

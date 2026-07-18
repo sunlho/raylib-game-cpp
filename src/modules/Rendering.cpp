@@ -5,6 +5,7 @@
 
 #include "Reflection.h"
 #include "Rendering.h"
+#include "Runtime/RuntimePhases.h"
 
 namespace Rendering {
 namespace {
@@ -279,7 +280,7 @@ module::module(flecs::world &world) {
       .set<RenderTexture2D>({});
 
   world.system<const Position, const RenderComponent>("Draw Renderables")
-      .kind<Phases::World>()
+      .kind<Runtime::Phases::DrawWorld>()
       .without<SortableTag>()
       .each([](const Position &p, const RenderComponent &renderable) {
         if (!renderable.visible || !renderable.object) {

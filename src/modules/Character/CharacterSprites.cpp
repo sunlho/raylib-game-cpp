@@ -12,6 +12,7 @@
 
 #include "modules/Assets.h"
 #include "modules/Rendering.h"
+#include "modules/Runtime/RuntimePhases.h"
 
 namespace Character {
 namespace {
@@ -100,7 +101,7 @@ Vector2 GetSpriteHalfExtents(const SpriteSet &spriteSet, const AnimationControll
       static_cast<float>(entry->animation.height) * spriteSet.scale * 0.5f};
 }
 
-void RegisterCharacterSprites(flecs::world &world) {
+void Internal::RegisterCharacterSprites(flecs::world &world) {
   world.observer<SpriteSet, AnimationController>("Load Character Sprites Observer")
       .event(flecs::OnSet)
       .each([](SpriteSet &spriteSet, AnimationController &controller) {
@@ -151,20 +152,20 @@ void RegisterCharacterSprites(flecs::world &world) {
       });
 
   world.system<CharacterInfo, const SpriteSet, AnimationController>("Select Character Animation")
-      .kind<Character::Phases::Update>()
+      .kind<Runtime::Phases::CharacterUpdate>()
       .each([](const CharacterInfo &info, const SpriteSet &spriteSet, AnimationController &controller) {
         if (!spriteSet.loaded) {
           return;
         }
 
-        const auto desired = Character::BuildAnimationKey(info.state, info.direction);
+        const auto desired = Internal::BuildAnimationKey(info.state, info.direction);
         if (spriteSet.FindEntry(desired)) {
           controller.PlayAnimation(desired);
           return;
         }
 
         if (info.state != CharacterState::Idle) {
-          const auto fallback = Character::BuildAnimationKey(CharacterState::Idle, info.direction);
+          const auto fallback = Internal::BuildAnimationKey(CharacterState::Idle, info.direction);
           if (spriteSet.FindEntry(fallback)) {
             controller.PlayAnimation(fallback);
           }

@@ -6,7 +6,7 @@
 
 #include "modules/Tilemap/Tilemap.h"
 
-namespace MapManager {
+namespace MapManager::Internal {
 
 Tilemap::LoadedMap *GetOrLoadMap(MapCacheState &cacheState, const std::string &path) {
   auto it = cacheState.cache.find(path);
@@ -38,4 +38,4 @@ Tilemap::LoadedMap *GetOrLoadMap(MapCacheState &cacheState, const std::string &p
   return &insertIt->second.loadedMap;
 }
 
-} // namespace MapManager
+} // namespace MapManager::Internal

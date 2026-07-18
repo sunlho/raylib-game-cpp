@@ -9,10 +9,6 @@
 
 namespace Character {
 
-struct Phases {
-  struct Update {};
-};
-
 enum class CharacterState : int {
   Idle = 0,
   Moving = 1,

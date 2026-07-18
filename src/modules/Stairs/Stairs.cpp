@@ -8,7 +8,7 @@
 #include "modules/Physics.h"
 #include "modules/Reflection.h"
 #include "modules/Rendering.h"
-#include "modules/Simulation.h"
+#include "modules/Runtime/RuntimePhases.h"
 
 namespace Stairs {
 namespace {
@@ -163,7 +163,7 @@ module::module(flecs::world &world) {
       });
 
   world.system("Process Stair Sensor Events")
-      .kind<Simulation::PostPhysics>()
+      .kind<Runtime::Phases::PostPhysics>()
       .run([](flecs::iter &it) {
         flecs::world world = it.world();
         for (const auto &event : Physics::SensorEvents(world)) {
@@ -176,7 +176,7 @@ module::module(flecs::world &world) {
       });
 
   world.system<const Rendering::Position, FloorState>("Update Stair Floor State")
-      .kind<Simulation::FixedUpdate>()
+      .kind<Runtime::Phases::FixedGameplay>()
       .each([](flecs::entity entity, const Rendering::Position &position, FloorState &state) {
         const Vector2 samplePoint = Vector2Add(position.value, state.sampleOffset);
 

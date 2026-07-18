@@ -10,12 +10,13 @@
 
 #include "modules/Movement.h"
 #include "modules/Reflection.h"
+#include "modules/Runtime/RuntimePhases.h"
 
-namespace Character {
+namespace Character::Internal {
 
 void RegisterCharacterAnimation(flecs::world &world) {
   world.system<CharacterStats, CharacterInfo>("Clamp Character Health")
-      .kind<Character::Phases::Update>()
+      .kind<Runtime::Phases::CharacterUpdate>()
       .each([](CharacterStats &stats, CharacterInfo &info) {
         if (stats.maxHealth < 1.0f) {
           stats.maxHealth = 1.0f;
@@ -32,7 +33,7 @@ void RegisterCharacterAnimation(flecs::world &world) {
       });
 
   world.system<CharacterInfo, const Movement::Velocity>("Update Character Direction")
-      .kind<Character::Phases::Update>()
+      .kind<Runtime::Phases::CharacterUpdate>()
       .each([](CharacterInfo &info, const Movement::Velocity &velocity) {
         if (info.state == CharacterState::Dead) {
           return;
@@ -55,7 +56,7 @@ void RegisterCharacterAnimation(flecs::world &world) {
       });
 
   world.system<CharacterInfo, AnimationController, IdleBehavior>("Handle Idle Delay")
-      .kind<Character::Phases::Update>()
+      .kind<Runtime::Phases::CharacterUpdate>()
       .each([](flecs::iter &it, size_t, CharacterInfo &info, AnimationController &controller, IdleBehavior &idle) {
         if (info.state == CharacterState::Moving) {
           idle.waiting = false;
@@ -71,10 +72,10 @@ void RegisterCharacterAnimation(flecs::world &world) {
           return;
         }
 
-        const auto idleKey = Character::BuildAnimationKey(CharacterState::Idle, info.direction);
+        const auto idleKey = BuildAnimationKey(CharacterState::Idle, info.direction);
 
         if (!idle.initialized || idle.wasMoving) {
-          idle.timer = Character::RandomDelaySeconds(idle.minDelay, idle.maxDelay);
+          idle.timer = RandomDelaySeconds(idle.minDelay, idle.maxDelay);
           idle.waiting = true;
           idle.playing = false;
           idle.wasMoving = false;
@@ -92,7 +93,7 @@ void RegisterCharacterAnimation(flecs::world &world) {
             controller.PlayAnimation(idleKey, true);
             controller.currentFrame = 0;
             controller.elapsed = 0.0f;
-            if (auto *clip = Character::FindClip(controller, idleKey)) {
+            if (auto *clip = FindClip(controller, idleKey)) {
               clip->loop = false;
             }
           }
@@ -105,7 +106,7 @@ void RegisterCharacterAnimation(flecs::world &world) {
               controller.currentFrame >= std::max(1, clip->frameCount) - 1) {
             idle.playing = false;
             idle.waiting = true;
-            idle.timer = Character::RandomDelaySeconds(idle.minDelay, idle.maxDelay);
+            idle.timer = RandomDelaySeconds(idle.minDelay, idle.maxDelay);
             controller.currentFrame = 0;
             controller.elapsed = 0.0f;
           }
@@ -113,7 +114,7 @@ void RegisterCharacterAnimation(flecs::world &world) {
       });
 
   world.system<AnimationController>("Advance Character Animations")
-      .kind<Character::Phases::Update>()
+      .kind<Runtime::Phases::CharacterUpdate>()
       .each([](flecs::iter &it, size_t i, AnimationController &controller) {
         auto entity = it.entity(i);
         if (entity.has<IdleBehavior>()) {
@@ -147,4 +148,4 @@ void RegisterCharacterAnimation(flecs::world &world) {
       });
 }
 
-} // namespace Character
+} // namespace Character::Internal

@@ -5,6 +5,7 @@
 #include "CharacterInternal.h"
 
 namespace Character {
+namespace Internal {
 
 const char *DirectionSuffix(CharacterDirection direction) {
   switch (direction) {
@@ -70,6 +71,8 @@ float RandomDelaySeconds(float minDelay, float maxDelay) {
   const int delayMs = GetRandomValue(minMs, maxMs);
   return static_cast<float>(delayMs) / 1000.0f;
 }
+
+} // namespace Internal
 
 void AnimationController::AddAnimation(AnimationClip clip) {
   if (clip.frameCount < 1) {

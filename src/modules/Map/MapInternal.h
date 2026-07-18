@@ -14,7 +14,7 @@
 #include "modules/Rendering.h"
 #include "modules/Tilemap/Tilemap.h"
 
-namespace MapManager {
+namespace MapManager::Internal {
 
 struct MapPath {
   std::string value;
@@ -77,4 +77,4 @@ private:
 void RegisterMapLoader(flecs::world &world);
 void RegisterMapRendering(flecs::world &world);
 
-} // namespace MapManager
+} // namespace MapManager::Internal

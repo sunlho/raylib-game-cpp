@@ -13,7 +13,7 @@
 #include "Physics.h"
 #include "Reflection.h"
 #include "Rendering.h"
-#include "Simulation.h"
+#include "Runtime/RuntimePhases.h"
 
 namespace Movement {
 namespace {
@@ -39,7 +39,7 @@ module::module(flecs::world &world) {
   Reflection::Register<MoveSpeed>(world);
 
   world.system<Velocity, const MoveSpeed>("Update Player Input")
-      .kind<Movement::Phases::Update>()
+      .kind<Runtime::Phases::MovementUpdate>()
       .with<PlayerControlled>()
       .each([](flecs::iter &it, size_t, Velocity &velocity, const MoveSpeed &speed) {
         if (GameConsole::IsOpen(it.world())) {
@@ -61,7 +61,7 @@ module::module(flecs::world &world) {
       });
 
   world.system<Rendering::Position, const Character::SpriteSet, const Character::AnimationController, Rendering::RenderComponent, const Physics::PhysicsBody>("Clamp Player To Map Bounds")
-      .kind<Simulation::FixedUpdate>()
+      .kind<Runtime::Phases::FixedGameplay>()
       .with<PlayerControlled>()
       .each([](flecs::iter &it, size_t, Rendering::Position &position, const Character::SpriteSet &spriteSet, const Character::AnimationController &controller, Rendering::RenderComponent &renderComponent, const Physics::PhysicsBody &physicsBody) {
         const auto &mapBounds = it.world().get<MapManager::MapBounds>();
@@ -82,7 +82,7 @@ module::module(flecs::world &world) {
 
   world.system<const Rendering::Position>("Follow Camera Target")
       .with<CameraFollowTag>()
-      .kind<Movement::Phases::CameraFollow>()
+      .kind<Runtime::Phases::CameraFollow>()
       .each([](flecs::iter &it, size_t i, const Rendering::Position &position) {
         auto world = it.world();
         auto &mainCamera = world.get_mut<GameCamera::MainCamera>();

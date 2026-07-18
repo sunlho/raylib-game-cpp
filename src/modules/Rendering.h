@@ -10,12 +10,6 @@
 
 namespace Rendering {
 
-struct Phases {
-  struct Background {};
-  struct World {};
-  struct SortedWorld {};
-};
-
 struct Position {
   Vector2 value;
 };

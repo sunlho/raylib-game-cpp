@@ -36,6 +36,8 @@ add_executable(${PROJECT_NAME}
     src/modules/Console/Register.cpp
     src/modules/Movement.cpp
     src/modules/Rendering.cpp
+    src/modules/Runtime/Runtime.cpp
+    src/modules/Runtime/RuntimeRaylib.cpp
     src/modules/Physics.cpp
     src/modules/Stairs/Stairs.cpp
 

@@ -12,7 +12,7 @@
 #include "modules/Stairs/Stairs.h"
 #include "modules/Tilemap/Tilemap.h"
 
-namespace MapManager {
+namespace MapManager::Internal {
 namespace {
 
 using Clock = std::chrono::steady_clock;
@@ -230,4 +230,4 @@ void RegisterMapLoader(flecs::world &world) {
       });
 }
 
-} // namespace MapManager
+} // namespace MapManager::Internal

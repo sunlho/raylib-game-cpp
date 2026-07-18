@@ -22,7 +22,7 @@ bool LoadFromPath(const std::string &path, LoadedMap &loadedMap) {
     return false;
   }
 
-  loadedMap.textureBank = TilemapInternal::LoadTilesetTextures(tilemap, path);
+  loadedMap.textureBank = Internal::LoadTilesetTextures(tilemap, path);
 
   const auto mapTileCount = tilemap.getTileCount();
   const auto mapTileSize = tilemap.getTileSize();
@@ -43,14 +43,14 @@ bool LoadFromPath(const std::string &path, LoadedMap &loadedMap) {
 
     if (layer->getType() == tmx::Layer::Type::Tile) {
       const auto &tileLayer = layer->getLayerAs<tmx::TileLayer>();
-      TilemapInternal::BuildLayerChunks(tilemap, tileLayer, layerIndex, loadedMap);
+      Internal::BuildLayerChunks(tilemap, tileLayer, layerIndex, loadedMap);
     } else if (layer->getType() == tmx::Layer::Type::Object) {
       const auto &objectGroup = layer->getLayerAs<tmx::ObjectGroup>();
       const auto classType = objectGroup.getClass();
       if (classType == "Collisions") {
-        TilemapInternal::BuildObjectCollisions(tilemap, objectGroup, layerIndex, loadedMap);
+        Internal::BuildObjectCollisions(tilemap, objectGroup, layerIndex, loadedMap);
       } else {
-        TilemapInternal::BuildObjectChunks(tilemap, objectGroup, layerIndex, loadedMap);
+        Internal::BuildObjectChunks(tilemap, objectGroup, layerIndex, loadedMap);
       }
     }
 
