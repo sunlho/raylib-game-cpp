@@ -13,6 +13,16 @@ struct MoveSpeed {
   float value;
 };
 
+struct RunSettings {
+  float speedMultiplier = 1.6f;
+  float accelerationTime = 0.2f;
+};
+
+struct RunState {
+  bool active = false;
+  float progress = 0.0f;
+};
+
 struct PlayerControlled {};
 struct CameraFollowTag {};
 

@@ -60,7 +60,9 @@ static ecs_entity_t CreatePlayer(flecs::world &world) {
       .set<Rendering::Position>({playerStart})
       .set<Stairs::FloorState>({2.5f, 2.5f})
       .set<Movement::Velocity>({Vector2{0.0f, 0.0f}})
-      .set<Movement::MoveSpeed>({85.0f});
+      .set<Movement::MoveSpeed>({100.0f})
+      .set<Movement::RunSettings>({1.6f, 0.2f})
+      .set<Movement::RunState>({});
 
   auto &mainCamera = world.get_mut<GameCamera::MainCamera>();
   const auto &renderTargetSize = world.get<Rendering::RenderTargetSize>();

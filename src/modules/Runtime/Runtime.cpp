@@ -139,7 +139,6 @@ FrameReport Coordinator::AdvanceFrame(FrameInput input) {
       RunPipeline(impl_->world, impl_->pipelines.postPhysics, impl_->settings.fixedTimeStep);
       RunPipeline(impl_->world, impl_->pipelines.fixedGameplay, impl_->settings.fixedTimeStep);
       RunPipeline(impl_->world, impl_->pipelines.characterUpdate, impl_->settings.fixedTimeStep);
-      RunPipeline(impl_->world, impl_->pipelines.cameraFollow, impl_->settings.fixedTimeStep);
 
       impl_->accumulator -= fixedTimeStep;
       if (impl_->accumulator < 0.0) {
@@ -162,6 +161,9 @@ FrameReport Coordinator::AdvanceFrame(FrameInput input) {
 
     report.droppedSimulationTime = static_cast<float>(droppedSimulationTime);
     impl_->totalDroppedSimulationTime += droppedSimulationTime;
+
+    // Camera smoothing belongs to render time, independently of fixed physics steps.
+    RunPipeline(impl_->world, impl_->pipelines.cameraFollow, acceptedFrameTime);
   }
 
   impl_->frameAdapter->PresentFrame(

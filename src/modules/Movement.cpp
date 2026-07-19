@@ -1,5 +1,6 @@
 
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 
 #include "raylib.h"
@@ -37,13 +38,16 @@ float ClampAxisToBounds(float value, float halfExtent, float mapExtent) {
 module::module(flecs::world &world) {
   Reflection::Register<Velocity>(world);
   Reflection::Register<MoveSpeed>(world);
+  Reflection::Register<RunSettings>(world);
+  Reflection::Register<RunState>(world);
 
-  world.system<Velocity, const MoveSpeed>("Update Player Input")
+  world.system<Velocity, const MoveSpeed, const RunSettings, RunState>("Update Player Input")
       .kind<Runtime::Phases::MovementUpdate>()
       .with<PlayerControlled>()
-      .each([](flecs::iter &it, size_t, Velocity &velocity, const MoveSpeed &speed) {
+      .each([](flecs::iter &it, size_t, Velocity &velocity, const MoveSpeed &speed, const RunSettings &runSettings, RunState &runState) {
         if (GameConsole::IsOpen(it.world())) {
           velocity.value = Vector2{0.0f, 0.0f};
+          runState = {};
           return;
         }
 
@@ -53,11 +57,27 @@ module::module(flecs::world &world) {
             static_cast<float>(IsKeyDown(KEY_S) || IsKeyDown(KEY_DOWN)) -
                 static_cast<float>(IsKeyDown(KEY_W) || IsKeyDown(KEY_UP))};
 
-        if (Vector2LengthSqr(direction) > 0.0f) {
+        const bool isMoving = Vector2LengthSqr(direction) > 0.0f;
+        if (isMoving) {
           direction = Vector2Normalize(direction);
         }
 
-        velocity.value = Vector2Scale(direction, speed.value);
+        runState.active = isMoving &&
+            (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT));
+
+        if (runState.active) {
+          const float accelerationTime = std::max(0.0f, runSettings.accelerationTime);
+          runState.progress = accelerationTime > 0.0f
+              ? std::min(1.0f, runState.progress + it.delta_time() / accelerationTime)
+              : 1.0f;
+        } else {
+          runState.progress = 0.0f;
+        }
+
+        const float runMultiplier = std::max(1.0f, runSettings.speedMultiplier);
+        const float accelerationCurve = std::sqrt(runState.progress);
+        const float currentMultiplier = 1.0f + (runMultiplier - 1.0f) * accelerationCurve;
+        velocity.value = Vector2Scale(direction, speed.value * currentMultiplier);
       });
 
   world.system<Rendering::Position, const Character::SpriteSet, const Character::AnimationController, Rendering::RenderComponent, const Physics::PhysicsBody>("Clamp Player To Map Bounds")
@@ -88,19 +108,16 @@ module::module(flecs::world &world) {
         auto &mainCamera = world.get_mut<GameCamera::MainCamera>();
         const auto mapBounds = world.get<MapManager::MapBounds>();
         const auto renderTargetSize = world.get<Rendering::RenderTargetSize>();
-        const bool snapTargetToPixel = mainCamera.snapTargetToPixel;
+        const Vector2 target = Vector2Add(position.value, mainCamera.followOffset);
 
-        Vector2 target = Vector2Add(position.value, mainCamera.followOffset);
-
-        if (snapTargetToPixel) {
-          target.x = roundf(target.x);
-          target.y = roundf(target.y);
+        if (mainCamera.followSpeed <= 0.0f) {
+          mainCamera.value.target = target;
+        } else {
+          const float deltaTime = it.delta_time();
+          const float followAmount = 1.0f - expf(-mainCamera.followSpeed * deltaTime);
+          const float lerpAmount = followAmount > 1.0f ? 1.0f : followAmount;
+          mainCamera.value.target = Vector2Lerp(mainCamera.value.target, target, lerpAmount);
         }
-
-        const float deltaTime = it.delta_time();
-        const float followAmount = 1.0f - expf(-mainCamera.followSpeed * deltaTime);
-        const float lerpAmount = followAmount > 1.0f ? 1.0f : followAmount;
-        mainCamera.value.target = Vector2Lerp(mainCamera.value.target, target, lerpAmount);
 
         const Vector2 viewportHalf = Vector2{
             renderTargetSize.dimension.x * 0.5f,
@@ -108,11 +125,6 @@ module::module(flecs::world &world) {
 
         mainCamera.value.target.x = ClampAxisToBounds(mainCamera.value.target.x, viewportHalf.x, mapBounds.dimension.x);
         mainCamera.value.target.y = ClampAxisToBounds(mainCamera.value.target.y, viewportHalf.y, mapBounds.dimension.y);
-
-        if (snapTargetToPixel) {
-          mainCamera.value.target.x = roundf(mainCamera.value.target.x);
-          mainCamera.value.target.y = roundf(mainCamera.value.target.y);
-        }
       });
 }
 
