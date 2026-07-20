@@ -20,13 +20,46 @@ struct LoadingSequenceState {
   float stepElapsed = 0.0f;
 };
 
+struct PixelScaleShader {
+  Shader value = {};
+  int sourceSizeLocation = -1;
+  int scaleLocation = -1;
+  bool valid = false;
+};
+
+constexpr const char *PixelScaleFragmentShader = R"glsl(
+#version 330
+
+in vec2 fragTexCoord;
+in vec4 fragColor;
+
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+uniform vec2 sourceSize;
+uniform float scale;
+
+out vec4 finalColor;
+
+void main() {
+  vec2 pixelPosition = fragTexCoord * sourceSize;
+  vec2 pixelFraction = fract(pixelPosition);
+  vec2 sampleOffset =
+      clamp(pixelFraction * scale, vec2(0.0), vec2(0.5)) +
+      clamp((pixelFraction - vec2(1.0)) * scale + vec2(0.5), vec2(0.0), vec2(0.5));
+  vec2 sampleUv = (floor(pixelPosition) + sampleOffset) / sourceSize;
+
+  finalColor = texture(texture0, sampleUv) * colDiffuse * fragColor;
+}
+)glsl";
+
 // Overscan prevents subpixel composition from exposing a black edge.
 constexpr int RenderTargetPadding = 1;
 
 void DrawScaledRenderTarget(
     const RenderTexture2D &renderTarget,
     const Vector2 &targetSize,
-    const RenderTargetState &state) {
+    const RenderTargetState &state,
+    const PixelScaleShader &pixelScaleShader) {
   const int screenWidth = GetScreenWidth();
   const int screenHeight = GetScreenHeight();
   const int targetWidth = static_cast<int>(targetSize.x);
@@ -57,12 +90,27 @@ void DrawScaledRenderTarget(
       Vector2Scale(state.cameraSubpixelOffset, static_cast<float>(scale)),
       0.0f,
       1.0f};
+
+  const Vector2 sourceSize = {
+      static_cast<float>(renderTarget.texture.width),
+      static_cast<float>(renderTarget.texture.height)};
+  const float shaderScale = static_cast<float>(scale);
+  if (pixelScaleShader.valid) {
+    SetShaderValue(pixelScaleShader.value, pixelScaleShader.sourceSizeLocation, &sourceSize, SHADER_UNIFORM_VEC2);
+    SetShaderValue(pixelScaleShader.value, pixelScaleShader.scaleLocation, &shaderScale, SHADER_UNIFORM_FLOAT);
+    BeginShaderMode(pixelScaleShader.value);
+  }
+
   BeginMode2D(screenCamera);
   DrawTexturePro(renderTarget.texture, source, destination, Vector2{0.0f, 0.0f}, 0.0f, WHITE);
   EndMode2D();
+
+  if (pixelScaleShader.valid) {
+    EndShaderMode();
+  }
 }
 
-bool EnsureRenderTarget(RenderTexture2D &renderTarget, const Vector2 &size, int padding) {
+bool EnsureRenderTarget(RenderTexture2D &renderTarget, const Vector2 &size, int padding, bool usePixelScaleShader) {
   const int width = static_cast<int>(size.x) + padding * 2;
   const int height = static_cast<int>(size.y) + padding * 2;
 
@@ -84,7 +132,9 @@ bool EnsureRenderTarget(RenderTexture2D &renderTarget, const Vector2 &size, int 
       return false;
     }
 
-    SetTextureFilter(renderTarget.texture, TEXTURE_FILTER_POINT);
+    SetTextureFilter(
+        renderTarget.texture,
+        usePixelScaleShader ? TEXTURE_FILTER_BILINEAR : TEXTURE_FILTER_POINT);
   }
 
   return true;
@@ -246,6 +296,7 @@ void BeginFrame(flecs::world &world) {
   const auto &renderTargetSize = world.get<RenderTargetSize>();
   auto &renderTargetState = world.get_mut<RenderTargetState>();
   const auto &mainCamera = world.get<GameCamera::MainCamera>();
+  const auto &pixelScaleShader = world.get<PixelScaleShader>();
 
   BeginDrawing();
   renderTargetState.padding = mainCamera.enabled ? RenderTargetPadding : 0;
@@ -253,7 +304,8 @@ void BeginFrame(flecs::world &world) {
   renderTargetState.active = EnsureRenderTarget(
       renderTarget,
       renderTargetSize.dimension,
-      renderTargetState.padding);
+      renderTargetState.padding,
+      pixelScaleShader.valid);
   if (renderTargetState.active) {
     BeginTextureMode(renderTarget);
   }
@@ -263,6 +315,7 @@ void BeginFrame(flecs::world &world) {
 void PresentFrame(flecs::world &world) {
   const auto &renderTargetState = world.get<RenderTargetState>();
   const auto &renderTargetSize = world.get<RenderTargetSize>();
+  const auto &pixelScaleShader = world.get<PixelScaleShader>();
 
   const float padding = renderTargetState.active
       ? static_cast<float>(renderTargetState.padding)
@@ -284,7 +337,8 @@ void PresentFrame(flecs::world &world) {
     DrawScaledRenderTarget(
         world.get<RenderTexture2D>(),
         renderTargetSize.dimension,
-        renderTargetState);
+        renderTargetState,
+        pixelScaleShader);
   }
 
   DrawFPS(GetScreenWidth() - 100, 10);
@@ -295,6 +349,24 @@ void EndFrame() {
 }
 
 module::module(flecs::world &world) {
+  PixelScaleShader pixelScaleShader;
+  pixelScaleShader.value = LoadShaderFromMemory(nullptr, PixelScaleFragmentShader);
+  pixelScaleShader.sourceSizeLocation = GetShaderLocation(pixelScaleShader.value, "sourceSize");
+  pixelScaleShader.scaleLocation = GetShaderLocation(pixelScaleShader.value, "scale");
+  pixelScaleShader.valid = pixelScaleShader.sourceSizeLocation >= 0 && pixelScaleShader.scaleLocation >= 0;
+
+  world.component<PixelScaleShader>()
+      .add(flecs::Singleton)
+      .set<PixelScaleShader>(pixelScaleShader);
+  world.system<PixelScaleShader>("Unload Pixel Scale Shader")
+      .kind(flecs::OnRemove)
+      .each([](PixelScaleShader &shader) {
+        if (shader.value.id != 0) {
+          UnloadShader(shader.value);
+          shader.value = {};
+        }
+      });
+
   Reflection::Register<Position>(world);
   Reflection::Register<Rectangle>(world);
   Reflection::Register<RenderComponent>(world);
