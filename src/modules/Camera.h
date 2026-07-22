@@ -16,6 +16,10 @@ struct MainCamera {
   Vector2 followOffset = {0.0f, 0.0f};
   float followSpeed = 6.0f;
   bool snapTargetToPixel = true;
+  Vector2 previousFollowTarget = {0.0f, 0.0f};
+  bool hasPreviousFollowTarget = false;
+  Vector2 followRenderPosition = {0.0f, 0.0f};
+  bool useFollowRenderPosition = false;
 };
 
 void Begin2D(flecs::world &world);

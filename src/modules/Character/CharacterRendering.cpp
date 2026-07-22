@@ -1,6 +1,8 @@
 
 #include "CharacterInternal.h"
 
+#include "modules/Camera.h"
+#include "modules/Movement.h"
 #include "modules/Rendering.h"
 
 namespace Character::Internal {
@@ -52,9 +54,17 @@ void CharacterRenderable::Draw(const Rendering::Position &position) const {
       0.0f,
       static_cast<float>(animation.width),
       static_cast<float>(animation.height)};
+  Vector2 renderPosition = position.value;
+  if (entity_.has<Movement::CameraFollowTag>()) {
+    const auto &mainCamera = entity_.world().get<GameCamera::MainCamera>();
+    if (mainCamera.useFollowRenderPosition) {
+      renderPosition = mainCamera.followRenderPosition;
+    }
+  }
+
   Rectangle dest = {
-      position.value.x,
-      position.value.y,
+      renderPosition.x,
+      renderPosition.y,
       static_cast<float>(animation.width) * spriteSet.scale,
       static_cast<float>(animation.height) * spriteSet.scale};
   dest.x = roundf(dest.x);

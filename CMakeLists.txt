@@ -58,6 +58,7 @@ add_executable(${PROJECT_NAME}
 
     src/modules/Debug/DebugDraw.cpp
     src/modules/Debug/PhysicsDebugDraw.cpp
+    src/modules/Debug/Screenshot.cpp
 )
 target_include_directories(${PROJECT_NAME} PRIVATE src)
 

@@ -11,6 +11,7 @@ class FrameStepper {
 public:
   void UpdateControls(bool controlsEnabled) {
     stepRequested_ = false;
+    screenshotStepRequested_ = false;
     pauseStateChanged_ = false;
 
     if (!controlsEnabled) {
@@ -29,6 +30,11 @@ public:
       }
       stepRequested_ = true;
     }
+
+    if (paused_ && IsKeyPressed(KEY_F8)) {
+      stepRequested_ = true;
+      screenshotStepRequested_ = true;
+    }
   }
 
   [[nodiscard]] bool IsPaused() const {
@@ -41,6 +47,10 @@ public:
 
   [[nodiscard]] bool DidPauseStateChange() const {
     return pauseStateChanged_;
+  }
+
+  [[nodiscard]] bool DidRequestScreenshotStep() const {
+    return screenshotStepRequested_;
   }
 
   [[nodiscard]] bool ShouldAdvanceSimulation() const {
@@ -57,7 +67,7 @@ public:
     constexpr int padding = 8;
 
     const std::string status = paused_
-        ? "SIMULATION PAUSED  |  F7: STEP  |  F6: RESUME  |  TICK: " + std::to_string(fixedStepCount_)
+        ? "SIMULATION PAUSED  |  F7: STEP  |  F8: SCREENSHOT STEP  |  F6: RESUME  |  TICK: " + std::to_string(fixedStepCount_)
         : "SIMULATION RUNNING  |  F6: PAUSE  |  F7: STEP";
     const int width = MeasureText(status.c_str(), fontSize) + padding * 2;
     const Color background = paused_ ? Color{112, 42, 35, 225} : Color{20, 24, 30, 190};
@@ -71,6 +81,7 @@ public:
 private:
   bool paused_ = false;
   bool stepRequested_ = false;
+  bool screenshotStepRequested_ = false;
   bool pauseStateChanged_ = false;
   std::uint64_t fixedStepCount_ = 0;
 };

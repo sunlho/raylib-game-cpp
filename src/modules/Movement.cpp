@@ -19,6 +19,8 @@
 namespace Movement {
 namespace {
 
+constexpr float DiagonalMovementEpsilon = 1.0e-4f;
+
 float ClampAxisToBounds(float value, float halfExtent, float mapExtent) {
   if (mapExtent <= 0.0f) {
     return value;
@@ -31,6 +33,22 @@ float ClampAxisToBounds(float value, float halfExtent, float mapExtent) {
   }
 
   return std::clamp(value, minValue, maxValue);
+}
+
+bool IsEqualMagnitudeDiagonal(Vector2 delta) {
+  const float absX = std::fabs(delta.x);
+  const float absY = std::fabs(delta.y);
+  const float magnitude = std::max(absX, absY);
+  if (std::min(absX, absY) <= DiagonalMovementEpsilon) {
+    return false;
+  }
+
+  return std::fabs(absX - absY) <=
+         std::max(DiagonalMovementEpsilon, magnitude * 1.0e-3f);
+}
+
+float DirectionSign(float value) {
+  return value < 0.0f ? -1.0f : 1.0f;
 }
 
 } // namespace
@@ -110,30 +128,53 @@ module::module(flecs::world &world) {
         const auto renderTargetSize = world.get<Rendering::RenderTargetSize>();
         const bool snapTargetToPixel = mainCamera.snapTargetToPixel;
 
-        Vector2 target = Vector2Add(position.value, mainCamera.followOffset);
-
-        if (snapTargetToPixel) {
-          target.x = roundf(target.x);
-          target.y = roundf(target.y);
-        }
-
-        // const float deltaTime = it.delta_time();
-        // const float followAmount = 1.0f - expf(-mainCamera.followSpeed * deltaTime);
-        // const float lerpAmount = followAmount > 1.0f ? 1.0f : followAmount;
-        // mainCamera.value.target = Vector2Lerp(mainCamera.value.target, target, lerpAmount);
-        mainCamera.value.target = target;
-
         const Vector2 viewportHalf = Vector2{
             renderTargetSize.dimension.x * 0.5f,
             renderTargetSize.dimension.y * 0.5f};
 
-        mainCamera.value.target.x = ClampAxisToBounds(mainCamera.value.target.x, viewportHalf.x, mapBounds.dimension.x);
-        mainCamera.value.target.y = ClampAxisToBounds(mainCamera.value.target.y, viewportHalf.y, mapBounds.dimension.y);
+        const Vector2 desiredTarget = Vector2Add(position.value, mainCamera.followOffset);
+        Vector2 target = desiredTarget;
+        target.x = ClampAxisToBounds(target.x, viewportHalf.x, mapBounds.dimension.x);
+        target.y = ClampAxisToBounds(target.y, viewportHalf.y, mapBounds.dimension.y);
+        const bool targetClampedX = target.x != desiredTarget.x;
+        const bool targetClampedY = target.y != desiredTarget.y;
 
         if (snapTargetToPixel) {
-          mainCamera.value.target.x = roundf(mainCamera.value.target.x);
-          mainCamera.value.target.y = roundf(mainCamera.value.target.y);
+          Vector2 snappedTarget = {roundf(target.x), roundf(target.y)};
+
+          if (mainCamera.hasPreviousFollowTarget) {
+            const Vector2 followDelta = Vector2Subtract(target, mainCamera.previousFollowTarget);
+            if (IsEqualMagnitudeDiagonal(followDelta)) {
+              const Vector2 signs = {
+                  DirectionSign(followDelta.x),
+                  DirectionSign(followDelta.y)};
+              const Vector2 remaining = Vector2Subtract(target, mainCamera.value.target);
+              const float sharedStep = roundf(
+                  (remaining.x * signs.x + remaining.y * signs.y) * 0.5f);
+              snappedTarget = Vector2Add(
+                  mainCamera.value.target,
+                  Vector2Scale(signs, sharedStep));
+            }
+          }
+
+          target = snappedTarget;
+          target.x = roundf(ClampAxisToBounds(target.x, viewportHalf.x, mapBounds.dimension.x));
+          target.y = roundf(ClampAxisToBounds(target.y, viewportHalf.y, mapBounds.dimension.y));
         }
+
+        mainCamera.previousFollowTarget = Vector2{
+            ClampAxisToBounds(desiredTarget.x, viewportHalf.x, mapBounds.dimension.x),
+            ClampAxisToBounds(desiredTarget.y, viewportHalf.y, mapBounds.dimension.y)};
+        mainCamera.hasPreviousFollowTarget = true;
+        mainCamera.value.target = target;
+        mainCamera.useFollowRenderPosition = snapTargetToPixel && mainCamera.enabled;
+        mainCamera.followRenderPosition = Vector2{
+            targetClampedX
+                ? roundf(position.value.x)
+                : roundf(target.x - mainCamera.followOffset.x),
+            targetClampedY
+                ? roundf(position.value.y)
+                : roundf(target.y - mainCamera.followOffset.y)};
       });
 }
 

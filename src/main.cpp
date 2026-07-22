@@ -10,6 +10,7 @@
 #include "modules/Console/Register.h"
 #include "modules/Debug/DebugDraw.h"
 #include "modules/Debug/FrameStepper.h"
+#include "modules/Debug/Screenshot.h"
 #include "modules/Map/Map.h"
 #include "modules/Movement.h"
 #include "modules/Physics.h"
@@ -127,6 +128,7 @@ int main() {
   float fixedTimeStep = 1.0f / 60.0f;
   float accumulator = 0.0f;
   Debug::FrameStepper frameStepper;
+  Debug::ScreenshotCapture screenshotCapture;
   ecs_progress(world, 0);
   Rendering::RunLoadingSequence(
       world,
@@ -162,10 +164,14 @@ int main() {
     }
 
     const auto frameTime = GetFrameTime();
+    screenshotCapture.Update(frameTime);
     Rendering::UpdateLoadingScreen(world, frameTime);
 
     const bool loadingScreenVisible = Rendering::IsLoadingScreenVisible(world);
     frameStepper.UpdateControls(!loadingScreenVisible && !consoleIsOpen);
+    if (frameStepper.DidRequestScreenshotStep()) {
+      screenshotCapture.RequestCapture();
+    }
     if (frameStepper.DidPauseStateChange()) {
       // Discard partial/catch-up time at pause boundaries so one requested
       // frame always maps to exactly one fixed simulation step.
@@ -210,6 +216,8 @@ int main() {
     Rendering::PresentFrame(world);
     frameStepper.DrawOverlay();
     GameConsole::Draw(world);
+    screenshotCapture.CapturePending();
+    screenshotCapture.DrawNotification();
     Rendering::EndFrame();
 
     ecs_run(world, dequeue_rest, frameTime, NULL);
