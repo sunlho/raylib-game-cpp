@@ -11,7 +11,6 @@
 
 #include "modules/Camera.h"
 #include "modules/Rendering.h"
-#include "modules/Runtime/RuntimePhases.h"
 #include "modules/Tilemap/Tilemap.h"
 
 namespace MapManager::Internal {
@@ -75,7 +74,7 @@ void RegisterMapRendering(flecs::world &world) {
   auto sortScratch = std::make_shared<MapRenderScratch>();
 
   world.system("Draw Static Chunks")
-      .kind<Runtime::Phases::DrawBackground>()
+      .kind<Rendering::Phases::Background>()
       .run([](flecs::iter &it) {
         auto world = it.world();
         const auto &activeData = world.get<ActiveMapData>();
@@ -120,7 +119,7 @@ void RegisterMapRendering(flecs::world &world) {
 
   world.system<const Rendering::Position, const Rendering::RenderComponent>("Draw Sort Chunks")
       .with<const Rendering::SortableTag>()
-      .kind<Runtime::Phases::DrawSortedWorld>()
+      .kind<Rendering::Phases::SortedWorld>()
       .run([sortScratch = std::move(sortScratch)](flecs::iter &it) {
         auto world = it.world();
         const auto &activeData = world.get<ActiveMapData>();

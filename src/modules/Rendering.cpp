@@ -3,11 +3,8 @@
 #include <deque>
 #include <utility>
 
-#include "Camera.h"
-#include "raymath.h"
 #include "Reflection.h"
 #include "Rendering.h"
-#include "Runtime/RuntimePhases.h"
 
 namespace Rendering {
 namespace {
@@ -20,13 +17,7 @@ struct LoadingSequenceState {
   float stepElapsed = 0.0f;
 };
 
-// Overscan prevents subpixel composition from exposing a black edge.
-constexpr int RenderTargetPadding = 1;
-
-void DrawScaledRenderTarget(
-    const RenderTexture2D &renderTarget,
-    const Vector2 &targetSize,
-    const RenderTargetState &state) {
+void DrawScaledRenderTarget(const RenderTexture2D &renderTarget, const Vector2 &targetSize) {
   const int screenWidth = GetScreenWidth();
   const int screenHeight = GetScreenHeight();
   const int targetWidth = static_cast<int>(targetSize.x);
@@ -43,28 +34,20 @@ void DrawScaledRenderTarget(
   const int destinationHeight = targetHeight * scale;
   const int offsetX = (screenWidth - destinationWidth) / 2;
   const int offsetY = (screenHeight - destinationHeight) / 2;
-  const int scaledPadding = state.padding * scale;
 
   const Rectangle source = {0.0f, 0.0f, static_cast<float>(renderTarget.texture.width), -static_cast<float>(renderTarget.texture.height)};
   const Rectangle destination = {
-      static_cast<float>(offsetX - scaledPadding),
-      static_cast<float>(offsetY - scaledPadding),
-      static_cast<float>(destinationWidth + scaledPadding * 2),
-      static_cast<float>(destinationHeight + scaledPadding * 2)};
+      static_cast<float>(offsetX),
+      static_cast<float>(offsetY),
+      static_cast<float>(destinationWidth),
+      static_cast<float>(destinationHeight)};
 
-  const Camera2D screenCamera = {
-      Vector2{0.0f, 0.0f},
-      Vector2Scale(state.cameraSubpixelOffset, static_cast<float>(scale)),
-      0.0f,
-      1.0f};
-  BeginMode2D(screenCamera);
   DrawTexturePro(renderTarget.texture, source, destination, Vector2{0.0f, 0.0f}, 0.0f, WHITE);
-  EndMode2D();
 }
 
-bool EnsureRenderTarget(RenderTexture2D &renderTarget, const Vector2 &size, int padding) {
-  const int width = static_cast<int>(size.x) + padding * 2;
-  const int height = static_cast<int>(size.y) + padding * 2;
+bool EnsureRenderTarget(RenderTexture2D &renderTarget, const Vector2 &size) {
+  const int width = static_cast<int>(size.x);
+  const int height = static_cast<int>(size.y);
 
   if (width <= 0 || height <= 0) {
     return false;
@@ -245,15 +228,9 @@ void BeginFrame(flecs::world &world) {
   auto &renderTarget = world.get_mut<RenderTexture2D>();
   const auto &renderTargetSize = world.get<RenderTargetSize>();
   auto &renderTargetState = world.get_mut<RenderTargetState>();
-  const auto &mainCamera = world.get<GameCamera::MainCamera>();
 
   BeginDrawing();
-  renderTargetState.padding = mainCamera.enabled ? RenderTargetPadding : 0;
-  renderTargetState.cameraSubpixelOffset = Vector2{0.0f, 0.0f};
-  renderTargetState.active = EnsureRenderTarget(
-      renderTarget,
-      renderTargetSize.dimension,
-      renderTargetState.padding);
+  renderTargetState.active = EnsureRenderTarget(renderTarget, renderTargetSize.dimension);
   if (renderTargetState.active) {
     BeginTextureMode(renderTarget);
   }
@@ -264,27 +241,14 @@ void PresentFrame(flecs::world &world) {
   const auto &renderTargetState = world.get<RenderTargetState>();
   const auto &renderTargetSize = world.get<RenderTargetSize>();
 
-  const float padding = renderTargetState.active
-      ? static_cast<float>(renderTargetState.padding)
-      : 0.0f;
-  const Camera2D overlayCamera = {
-      Vector2{padding, padding},
-      Vector2{0.0f, 0.0f},
-      0.0f,
-      1.0f};
-  BeginMode2D(overlayCamera);
   DrawLoadingOverlay(
       world.get<LoadingScreen>(),
       world.get_mut<LoadingSequenceState>(),
       renderTargetSize.dimension);
-  EndMode2D();
 
   if (renderTargetState.active) {
     EndTextureMode();
-    DrawScaledRenderTarget(
-        world.get<RenderTexture2D>(),
-        renderTargetSize.dimension,
-        renderTargetState);
+    DrawScaledRenderTarget(world.get<RenderTexture2D>(), renderTargetSize.dimension);
   }
 
   DrawFPS(GetScreenWidth() - 100, 10);
@@ -315,7 +279,7 @@ module::module(flecs::world &world) {
       .set<RenderTexture2D>({});
 
   world.system<const Position, const RenderComponent>("Draw Renderables")
-      .kind<Runtime::Phases::DrawWorld>()
+      .kind<Phases::World>()
       .without<SortableTag>()
       .each([](const Position &p, const RenderComponent &renderable) {
         if (!renderable.visible || !renderable.object) {

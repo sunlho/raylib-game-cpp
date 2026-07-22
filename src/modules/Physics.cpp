@@ -11,7 +11,7 @@
 #include "Movement.h"
 #include "Physics.h"
 #include "Rendering.h"
-#include "Runtime/RuntimePhases.h"
+#include "Simulation.h"
 
 namespace Physics {
 namespace {
@@ -212,7 +212,7 @@ module::module(flecs::world &world) {
   world.set<PhysicsWorld>({b2CreateWorld(&worldDef), {}});
 
   world.system<const Movement::Velocity, const PhysicsBody>("Apply Entity Velocity")
-      .kind<Runtime::Phases::PrePhysics>()
+      .kind<Simulation::PrePhysics>()
       .each([](const Movement::Velocity &velocity, const PhysicsBody &body) {
         const b2BodyId bodyId = PhysicsAccess::BodyId(body);
         if (b2Body_IsValid(bodyId)) {
@@ -221,7 +221,7 @@ module::module(flecs::world &world) {
       });
 
   world.system("Step Physics World")
-      .kind<Runtime::Phases::PhysicsStep>()
+      .kind<Simulation::PhysicsStep>()
       .run([](flecs::iter &it) {
         auto &physicsWorld = GetWorld(it.world());
         if (!b2World_IsValid(physicsWorld.id)) {
@@ -234,7 +234,7 @@ module::module(flecs::world &world) {
       });
 
   world.system<Rendering::Position, const PhysicsBody>("Sync Physics Positions")
-      .kind<Runtime::Phases::PostPhysics>()
+      .kind<Simulation::PostPhysics>()
       .each([](Rendering::Position &position, const PhysicsBody &body) {
         const b2BodyId bodyId = PhysicsAccess::BodyId(body);
         if (!b2Body_IsValid(bodyId)) {
@@ -307,8 +307,8 @@ void CreateStaticCollision(
     primaryShapeId = b2CreatePolygonShape(bodyId, &shapeDef, &box);
   } else {
     std::vector<b2Vec2> points = shape == StaticCollisionShape::Ellipse
-        ? BuildEllipsePoints(worldBounds)
-        : BuildRelativePoints(worldPoints, center);
+                                     ? BuildEllipsePoints(worldBounds)
+                                     : BuildRelativePoints(worldPoints, center);
 
     b2ChainDef chainDef = b2DefaultChainDef();
     chainDef.points = points.data();

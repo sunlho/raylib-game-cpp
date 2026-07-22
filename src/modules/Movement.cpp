@@ -9,12 +9,12 @@
 #include "Camera.h"
 #include "Character/Character.h"
 #include "Console/Console.h"
-#include "Movement.h"
 #include "Map/Map.h"
+#include "Movement.h"
 #include "Physics.h"
 #include "Reflection.h"
 #include "Rendering.h"
-#include "Runtime/RuntimePhases.h"
+#include "Simulation.h"
 
 namespace Movement {
 namespace {
@@ -42,7 +42,7 @@ module::module(flecs::world &world) {
   Reflection::Register<RunState>(world);
 
   world.system<Velocity, const MoveSpeed, const RunSettings, RunState>("Update Player Input")
-      .kind<Runtime::Phases::MovementUpdate>()
+      .kind<Movement::Phases::Update>()
       .with<PlayerControlled>()
       .each([](flecs::iter &it, size_t, Velocity &velocity, const MoveSpeed &speed, const RunSettings &runSettings, RunState &runState) {
         if (GameConsole::IsOpen(it.world())) {
@@ -63,13 +63,13 @@ module::module(flecs::world &world) {
         }
 
         runState.active = isMoving &&
-            (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT));
+                          (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT));
 
         if (runState.active) {
           const float accelerationTime = std::max(0.0f, runSettings.accelerationTime);
           runState.progress = accelerationTime > 0.0f
-              ? std::min(1.0f, runState.progress + it.delta_time() / accelerationTime)
-              : 1.0f;
+                                  ? std::min(1.0f, runState.progress + it.delta_time() / accelerationTime)
+                                  : 1.0f;
         } else {
           runState.progress = 0.0f;
         }
@@ -81,7 +81,7 @@ module::module(flecs::world &world) {
       });
 
   world.system<Rendering::Position, const Character::SpriteSet, const Character::AnimationController, Rendering::RenderComponent, const Physics::PhysicsBody>("Clamp Player To Map Bounds")
-      .kind<Runtime::Phases::FixedGameplay>()
+      .kind<Simulation::FixedUpdate>()
       .with<PlayerControlled>()
       .each([](flecs::iter &it, size_t, Rendering::Position &position, const Character::SpriteSet &spriteSet, const Character::AnimationController &controller, Rendering::RenderComponent &renderComponent, const Physics::PhysicsBody &physicsBody) {
         const auto &mapBounds = it.world().get<MapManager::MapBounds>();
@@ -102,22 +102,26 @@ module::module(flecs::world &world) {
 
   world.system<const Rendering::Position>("Follow Camera Target")
       .with<CameraFollowTag>()
-      .kind<Runtime::Phases::CameraFollow>()
+      .kind<Movement::Phases::CameraFollow>()
       .each([](flecs::iter &it, size_t i, const Rendering::Position &position) {
         auto world = it.world();
         auto &mainCamera = world.get_mut<GameCamera::MainCamera>();
         const auto mapBounds = world.get<MapManager::MapBounds>();
         const auto renderTargetSize = world.get<Rendering::RenderTargetSize>();
-        const Vector2 target = Vector2Add(position.value, mainCamera.followOffset);
+        const bool snapTargetToPixel = mainCamera.snapTargetToPixel;
 
-        if (mainCamera.followSpeed <= 0.0f) {
-          mainCamera.value.target = target;
-        } else {
-          const float deltaTime = it.delta_time();
-          const float followAmount = 1.0f - expf(-mainCamera.followSpeed * deltaTime);
-          const float lerpAmount = followAmount > 1.0f ? 1.0f : followAmount;
-          mainCamera.value.target = Vector2Lerp(mainCamera.value.target, target, lerpAmount);
+        Vector2 target = Vector2Add(position.value, mainCamera.followOffset);
+
+        if (snapTargetToPixel) {
+          target.x = roundf(target.x);
+          target.y = roundf(target.y);
         }
+
+        // const float deltaTime = it.delta_time();
+        // const float followAmount = 1.0f - expf(-mainCamera.followSpeed * deltaTime);
+        // const float lerpAmount = followAmount > 1.0f ? 1.0f : followAmount;
+        // mainCamera.value.target = Vector2Lerp(mainCamera.value.target, target, lerpAmount);
+        mainCamera.value.target = target;
 
         const Vector2 viewportHalf = Vector2{
             renderTargetSize.dimension.x * 0.5f,
@@ -125,6 +129,11 @@ module::module(flecs::world &world) {
 
         mainCamera.value.target.x = ClampAxisToBounds(mainCamera.value.target.x, viewportHalf.x, mapBounds.dimension.x);
         mainCamera.value.target.y = ClampAxisToBounds(mainCamera.value.target.y, viewportHalf.y, mapBounds.dimension.y);
+
+        if (snapTargetToPixel) {
+          mainCamera.value.target.x = roundf(mainCamera.value.target.x);
+          mainCamera.value.target.y = roundf(mainCamera.value.target.y);
+        }
       });
 }
 

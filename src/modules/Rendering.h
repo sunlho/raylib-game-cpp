@@ -10,6 +10,12 @@
 
 namespace Rendering {
 
+struct Phases {
+  struct Background {};
+  struct World {};
+  struct SortedWorld {};
+};
+
 struct Position {
   Vector2 value;
 };
@@ -34,8 +40,6 @@ struct RenderTargetSize {
 
 struct RenderTargetState {
   bool active = false;
-  int padding = 0;
-  Vector2 cameraSubpixelOffset = {0.0f, 0.0f};
 };
 
 enum class LoadingPhase {

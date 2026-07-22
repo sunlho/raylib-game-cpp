@@ -131,7 +131,7 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
       world,
       {
           "resolution",
-          "<1-4>",
+          "<0-4>",
           "Set window size (1: 1280x720, 2: 1600x900, 3: 1920x1080, 4: 2560x1440)",
           [](flecs::world &, const std::vector<std::string> &arguments) {
             if (arguments.size() != 1) {
@@ -153,13 +153,33 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
               width = 2560;
               height = 1440;
             } else {
-              return CommandResult{false, "Usage: resolution <1-4> (1: 1280x720, 2: 1600x900, 3: 1920x1080, 4: 2560x1440)"};
+              return CommandResult{false, "Usage: resolution <0-4> (0: 640x360, 1: 1280x720, 2: 1600x900, 3: 1920x1080, 4: 2560x1440)"};
             }
 
             SetWindowSize(width, height);
             return CommandResult{
                 true,
                 "Window size set to " + std::to_string(width) + "x" + std::to_string(height)};
+          },
+      });
+
+  RegisterCommand(
+      world,
+      {
+          "camerascale",
+          "[0.1-10]",
+          "Show or set camera scale",
+          [](flecs::world &commandWorld, const std::vector<std::string> &arguments) {
+            auto &mainCamera = commandWorld.get_mut<GameCamera::MainCamera>();
+            if (arguments.empty()) {
+              return CommandResult{true, "Camera scale: " + std::to_string(mainCamera.value.zoom)};
+            }
+            float scale = 0.0f;
+            if (!ParseFloat(arguments.front(), scale) || scale < 0.1f || scale > 10.0f) {
+              return CommandResult{false, "Usage: cameraScale [0.1-10]"};
+            }
+            mainCamera.value.zoom = scale;
+            return CommandResult{true, "Camera scale set to " + std::to_string(scale)};
           },
       });
 

@@ -65,9 +65,10 @@ int InputCallback(ImGuiInputTextCallbackData *data) {
     }
   }
 
-  selected = state.historyIndex >= 0
-                 ? state.history[static_cast<size_t>(state.historyIndex)]
-                 : state.historyDraft;
+  selected =
+      state.historyIndex >= 0
+          ? state.history[static_cast<size_t>(state.historyIndex)]
+          : state.historyDraft;
   ReplaceInput(data, selected);
   return 0;
 }

@@ -10,13 +10,12 @@
 
 #include "modules/Movement.h"
 #include "modules/Reflection.h"
-#include "modules/Runtime/RuntimePhases.h"
 
 namespace Character::Internal {
 
 void RegisterCharacterAnimation(flecs::world &world) {
   world.system<CharacterStats, CharacterInfo>("Clamp Character Health")
-      .kind<Runtime::Phases::CharacterUpdate>()
+      .kind<Character::Phases::Update>()
       .each([](CharacterStats &stats, CharacterInfo &info) {
         if (stats.maxHealth < 1.0f) {
           stats.maxHealth = 1.0f;
@@ -33,7 +32,7 @@ void RegisterCharacterAnimation(flecs::world &world) {
       });
 
   world.system<CharacterInfo, const Movement::Velocity>("Update Character Direction")
-      .kind<Runtime::Phases::CharacterUpdate>()
+      .kind<Character::Phases::Update>()
       .each([](CharacterInfo &info, const Movement::Velocity &velocity) {
         if (info.state == CharacterState::Dead) {
           return;
@@ -56,7 +55,7 @@ void RegisterCharacterAnimation(flecs::world &world) {
       });
 
   world.system<CharacterInfo, AnimationController, IdleBehavior>("Handle Idle Delay")
-      .kind<Runtime::Phases::CharacterUpdate>()
+      .kind<Character::Phases::Update>()
       .each([](flecs::iter &it, size_t, CharacterInfo &info, AnimationController &controller, IdleBehavior &idle) {
         if (info.state == CharacterState::Moving) {
           idle.waiting = false;
@@ -114,7 +113,7 @@ void RegisterCharacterAnimation(flecs::world &world) {
       });
 
   world.system<AnimationController>("Advance Character Animations")
-      .kind<Runtime::Phases::CharacterUpdate>()
+      .kind<Character::Phases::Update>()
       .each([](flecs::iter &it, size_t i, AnimationController &controller) {
         auto entity = it.entity(i);
         if (entity.has<IdleBehavior>()) {

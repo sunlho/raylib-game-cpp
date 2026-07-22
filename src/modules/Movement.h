@@ -5,6 +5,11 @@
 
 namespace Movement {
 
+struct Phases {
+  struct Update {};
+  struct CameraFollow {};
+};
+
 struct Velocity {
   Vector2 value = {0.0f, 0.0f};
 };

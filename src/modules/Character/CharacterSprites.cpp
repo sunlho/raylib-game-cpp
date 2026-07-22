@@ -12,7 +12,6 @@
 
 #include "modules/Assets.h"
 #include "modules/Rendering.h"
-#include "modules/Runtime/RuntimePhases.h"
 
 namespace Character {
 namespace {
@@ -152,7 +151,7 @@ void Internal::RegisterCharacterSprites(flecs::world &world) {
       });
 
   world.system<CharacterInfo, const SpriteSet, AnimationController>("Select Character Animation")
-      .kind<Runtime::Phases::CharacterUpdate>()
+      .kind<Character::Phases::Update>()
       .each([](const CharacterInfo &info, const SpriteSet &spriteSet, AnimationController &controller) {
         if (!spriteSet.loaded) {
           return;
