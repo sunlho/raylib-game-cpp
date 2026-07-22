@@ -1,0 +1,78 @@
+#pragma once
+
+#include <cstdint>
+#include <string>
+
+#include "raylib.h"
+
+namespace Debug {
+
+class FrameStepper {
+public:
+  void UpdateControls(bool controlsEnabled) {
+    stepRequested_ = false;
+    pauseStateChanged_ = false;
+
+    if (!controlsEnabled) {
+      return;
+    }
+
+    if (IsKeyPressed(KEY_F6)) {
+      paused_ = !paused_;
+      pauseStateChanged_ = true;
+    }
+
+    if (IsKeyPressed(KEY_F7)) {
+      if (!paused_) {
+        paused_ = true;
+        pauseStateChanged_ = true;
+      }
+      stepRequested_ = true;
+    }
+  }
+
+  [[nodiscard]] bool IsPaused() const {
+    return paused_;
+  }
+
+  [[nodiscard]] bool IsStepRequested() const {
+    return stepRequested_;
+  }
+
+  [[nodiscard]] bool DidPauseStateChange() const {
+    return pauseStateChanged_;
+  }
+
+  [[nodiscard]] bool ShouldAdvanceSimulation() const {
+    return !paused_ || stepRequested_;
+  }
+
+  void RecordFixedStep() {
+    ++fixedStepCount_;
+  }
+
+  void DrawOverlay() const {
+    constexpr int margin = 10;
+    constexpr int fontSize = 16;
+    constexpr int padding = 8;
+
+    const std::string status = paused_
+        ? "SIMULATION PAUSED  |  F7: STEP  |  F6: RESUME  |  TICK: " + std::to_string(fixedStepCount_)
+        : "SIMULATION RUNNING  |  F6: PAUSE  |  F7: STEP";
+    const int width = MeasureText(status.c_str(), fontSize) + padding * 2;
+    const Color background = paused_ ? Color{112, 42, 35, 225} : Color{20, 24, 30, 190};
+    const Color border = paused_ ? Color{255, 184, 92, 255} : Color{95, 205, 228, 255};
+
+    DrawRectangle(margin, margin, width, fontSize + padding * 2, background);
+    DrawRectangleLines(margin, margin, width, fontSize + padding * 2, border);
+    DrawText(status.c_str(), margin + padding, margin + padding, fontSize, RAYWHITE);
+  }
+
+private:
+  bool paused_ = false;
+  bool stepRequested_ = false;
+  bool pauseStateChanged_ = false;
+  std::uint64_t fixedStepCount_ = 0;
+};
+
+} // namespace Debug
