@@ -28,8 +28,7 @@
 // constexpr int SCREEN_HEIGHT = 900;
 constexpr int SCREEN_WIDTH = 1280;
 constexpr int SCREEN_HEIGHT = 720;
-constexpr int BASE_WIDTH = 640;
-constexpr int BASE_HEIGHT = 360;
+constexpr float CAMERA_ZOOM = 2.0f;
 
 static bool isDebugDrawEnabled = false;
 
@@ -123,7 +122,8 @@ int main() {
   const auto fixedUpdate = buildPipeline<Simulation::FixedUpdate>(world);
 
   auto &renderTargetSize = world.get_mut<Rendering::RenderTargetSize>();
-  renderTargetSize.dimension = Vector2{static_cast<float>(BASE_WIDTH), static_cast<float>(BASE_HEIGHT)};
+  renderTargetSize.dimension = Vector2{static_cast<float>(SCREEN_WIDTH), static_cast<float>(SCREEN_HEIGHT)};
+  world.get_mut<GameCamera::MainCamera>().value.zoom = CAMERA_ZOOM;
 
   float fixedTimeStep = 1.0f / 60.0f;
   float accumulator = 0.0f;

@@ -62,16 +62,17 @@ public:
   }
 
   void DrawOverlay() const {
+    if (!paused_) {
+      return;
+    }
     constexpr int margin = 10;
     constexpr int fontSize = 16;
     constexpr int padding = 8;
 
-    const std::string status = paused_
-        ? "SIMULATION PAUSED  |  F7: STEP  |  F8: SCREENSHOT STEP  |  F6: RESUME  |  TICK: " + std::to_string(fixedStepCount_)
-        : "SIMULATION RUNNING  |  F6: PAUSE  |  F7: STEP";
+    const std::string status = "SIMULATION PAUSED  |  F7: STEP  |  F8: SCREENSHOT STEP  |  TICK: " + std::to_string(fixedStepCount_);
     const int width = MeasureText(status.c_str(), fontSize) + padding * 2;
-    const Color background = paused_ ? Color{112, 42, 35, 225} : Color{20, 24, 30, 190};
-    const Color border = paused_ ? Color{255, 184, 92, 255} : Color{95, 205, 228, 255};
+    const Color background = Color{112, 42, 35, 225};
+    const Color border = Color{255, 184, 92, 255};
 
     DrawRectangle(margin, margin, width, fontSize + padding * 2, background);
     DrawRectangleLines(margin, margin, width, fontSize + padding * 2, border);

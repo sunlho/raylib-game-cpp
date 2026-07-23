@@ -2,6 +2,7 @@
 #include "CharacterInternal.h"
 
 #include "modules/Camera.h"
+#include "modules/Debug/DebugDraw.h"
 #include "modules/Movement.h"
 #include "modules/Rendering.h"
 
@@ -49,16 +50,20 @@ void CharacterRenderable::Draw(const Rendering::Position &position) const {
     animation.lastFrame = frame;
   }
 
-  Rectangle src = {
-      0.0f,
-      0.0f,
-      static_cast<float>(animation.width),
-      static_cast<float>(animation.height)};
+  DebugDraw::DrawData drawData;
+  drawData.type = DebugDraw::DrawType::Text;
+  drawData.pos = position.value;
+  drawData.text = "Character Position: (" + std::to_string(static_cast<int>(position.value.x * 10000) / 10000.0f) + ", " + std::to_string(static_cast<int>(position.value.y * 10000) / 10000.0f) + ")";
+  DebugDraw::EnqueueDraw(drawData);
+
+  Rectangle src = {0.0f, 0.0f, static_cast<float>(animation.width), static_cast<float>(animation.height)};
   Vector2 renderPosition = position.value;
+  bool positionIsScreenPixelAligned = false;
   if (entity_.has<Movement::CameraFollowTag>()) {
     const auto &mainCamera = entity_.world().get<GameCamera::MainCamera>();
     if (mainCamera.useFollowRenderPosition) {
       renderPosition = mainCamera.followRenderPosition;
+      positionIsScreenPixelAligned = true;
     }
   }
 
@@ -67,8 +72,10 @@ void CharacterRenderable::Draw(const Rendering::Position &position) const {
       renderPosition.y,
       static_cast<float>(animation.width) * spriteSet.scale,
       static_cast<float>(animation.height) * spriteSet.scale};
-  dest.x = roundf(dest.x);
-  dest.y = roundf(dest.y);
+  if (!positionIsScreenPixelAligned) {
+    dest.x = roundf(dest.x);
+    dest.y = roundf(dest.y);
+  }
   Vector2 origin = spriteSet.useCenterOrigin ? Vector2{roundf(dest.width * 0.5f), roundf(dest.height * 0.5f)} : spriteSet.origin;
 
   DrawTexturePro(animation.texture, src, dest, origin, 0.0f, WHITE);

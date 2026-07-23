@@ -19,7 +19,15 @@
 namespace Movement {
 namespace {
 
-constexpr float DiagonalMovementEpsilon = 1.0e-4f;
+constexpr float MinimumCameraZoom = 1.0e-4f;
+
+float CameraPixelScale(float zoom) {
+  return std::max(std::fabs(zoom), MinimumCameraZoom);
+}
+
+float SnapToScreenPixel(float value, float pixelScale) {
+  return roundf(value * pixelScale) / pixelScale;
+}
 
 float ClampAxisToBounds(float value, float halfExtent, float mapExtent) {
   if (mapExtent <= 0.0f) {
@@ -35,20 +43,13 @@ float ClampAxisToBounds(float value, float halfExtent, float mapExtent) {
   return std::clamp(value, minValue, maxValue);
 }
 
-bool IsEqualMagnitudeDiagonal(Vector2 delta) {
-  const float absX = std::fabs(delta.x);
-  const float absY = std::fabs(delta.y);
-  const float magnitude = std::max(absX, absY);
-  if (std::min(absX, absY) <= DiagonalMovementEpsilon) {
-    return false;
+Vector2 SmoothCameraTarget(Vector2 current, Vector2 desired, float followSpeed, float deltaTime) {
+  if (followSpeed <= 0.0f || deltaTime <= 0.0f) {
+    return desired;
   }
 
-  return std::fabs(absX - absY) <=
-         std::max(DiagonalMovementEpsilon, magnitude * 1.0e-3f);
-}
-
-float DirectionSign(float value) {
-  return value < 0.0f ? -1.0f : 1.0f;
+  const float blend = 1.0f - std::exp(-followSpeed * deltaTime);
+  return Vector2Lerp(current, desired, std::clamp(blend, 0.0f, 1.0f));
 }
 
 } // namespace
@@ -80,14 +81,14 @@ module::module(flecs::world &world) {
           direction = Vector2Normalize(direction);
         }
 
-        runState.active = isMoving &&
-                          (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT));
+        runState.active = isMoving && (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT));
 
         if (runState.active) {
           const float accelerationTime = std::max(0.0f, runSettings.accelerationTime);
-          runState.progress = accelerationTime > 0.0f
-                                  ? std::min(1.0f, runState.progress + it.delta_time() / accelerationTime)
-                                  : 1.0f;
+          runState.progress =
+              accelerationTime > 0.0f
+                  ? std::min(1.0f, runState.progress + it.delta_time() / accelerationTime)
+                  : 1.0f;
         } else {
           runState.progress = 0.0f;
         }
@@ -127,54 +128,41 @@ module::module(flecs::world &world) {
         const auto mapBounds = world.get<MapManager::MapBounds>();
         const auto renderTargetSize = world.get<Rendering::RenderTargetSize>();
         const bool snapTargetToPixel = mainCamera.snapTargetToPixel;
+        const float pixelScale = CameraPixelScale(mainCamera.value.zoom);
 
         const Vector2 viewportHalf = Vector2{
-            renderTargetSize.dimension.x * 0.5f,
-            renderTargetSize.dimension.y * 0.5f};
+            renderTargetSize.dimension.x * 0.5f / pixelScale,
+            renderTargetSize.dimension.y * 0.5f / pixelScale};
 
         const Vector2 desiredTarget = Vector2Add(position.value, mainCamera.followOffset);
-        Vector2 target = desiredTarget;
+        Vector2 clampedDesiredTarget = desiredTarget;
+        clampedDesiredTarget.x = ClampAxisToBounds(clampedDesiredTarget.x, viewportHalf.x, mapBounds.dimension.x);
+        clampedDesiredTarget.y = ClampAxisToBounds(clampedDesiredTarget.y, viewportHalf.y, mapBounds.dimension.y);
+
+        Vector2 target = SmoothCameraTarget(
+            mainCamera.value.target,
+            clampedDesiredTarget,
+            mainCamera.followSpeed,
+            it.delta_time());
         target.x = ClampAxisToBounds(target.x, viewportHalf.x, mapBounds.dimension.x);
         target.y = ClampAxisToBounds(target.y, viewportHalf.y, mapBounds.dimension.y);
-        const bool targetClampedX = target.x != desiredTarget.x;
-        const bool targetClampedY = target.y != desiredTarget.y;
 
         if (snapTargetToPixel) {
-          Vector2 snappedTarget = {roundf(target.x), roundf(target.y)};
-
-          if (mainCamera.hasPreviousFollowTarget) {
-            const Vector2 followDelta = Vector2Subtract(target, mainCamera.previousFollowTarget);
-            if (IsEqualMagnitudeDiagonal(followDelta)) {
-              const Vector2 signs = {
-                  DirectionSign(followDelta.x),
-                  DirectionSign(followDelta.y)};
-              const Vector2 remaining = Vector2Subtract(target, mainCamera.value.target);
-              const float sharedStep = roundf(
-                  (remaining.x * signs.x + remaining.y * signs.y) * 0.5f);
-              snappedTarget = Vector2Add(
-                  mainCamera.value.target,
-                  Vector2Scale(signs, sharedStep));
-            }
-          }
-
-          target = snappedTarget;
-          target.x = roundf(ClampAxisToBounds(target.x, viewportHalf.x, mapBounds.dimension.x));
-          target.y = roundf(ClampAxisToBounds(target.y, viewportHalf.y, mapBounds.dimension.y));
+          target = Vector2{
+              SnapToScreenPixel(target.x, pixelScale),
+              SnapToScreenPixel(target.y, pixelScale)};
+          target.x = SnapToScreenPixel(ClampAxisToBounds(target.x, viewportHalf.x, mapBounds.dimension.x), pixelScale);
+          target.y = SnapToScreenPixel(ClampAxisToBounds(target.y, viewportHalf.y, mapBounds.dimension.y), pixelScale);
         }
 
-        mainCamera.previousFollowTarget = Vector2{
-            ClampAxisToBounds(desiredTarget.x, viewportHalf.x, mapBounds.dimension.x),
-            ClampAxisToBounds(desiredTarget.y, viewportHalf.y, mapBounds.dimension.y)};
-        mainCamera.hasPreviousFollowTarget = true;
         mainCamera.value.target = target;
         mainCamera.useFollowRenderPosition = snapTargetToPixel && mainCamera.enabled;
-        mainCamera.followRenderPosition = Vector2{
-            targetClampedX
-                ? roundf(position.value.x)
-                : roundf(target.x - mainCamera.followOffset.x),
-            targetClampedY
-                ? roundf(position.value.y)
-                : roundf(target.y - mainCamera.followOffset.y)};
+        const Vector2 playerFromCamera = Vector2Subtract(position.value, target);
+        mainCamera.followRenderPosition = Vector2Add(
+            target,
+            Vector2{
+                SnapToScreenPixel(playerFromCamera.x, pixelScale),
+                SnapToScreenPixel(playerFromCamera.y, pixelScale)});
       });
 }
 

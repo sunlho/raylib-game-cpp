@@ -133,7 +133,7 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
           "resolution",
           "<0-4>",
           "Set window size (1: 1280x720, 2: 1600x900, 3: 1920x1080, 4: 2560x1440)",
-          [](flecs::world &, const std::vector<std::string> &arguments) {
+          [](flecs::world &commandWorld, const std::vector<std::string> &arguments) {
             if (arguments.size() != 1) {
               return CommandResult{false, "Usage: resolution <1-4> (1: 1280x720, 2: 1600x900, 3: 1920x1080, 4: 2560x1440)"};
             }
@@ -157,6 +157,9 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
             }
 
             SetWindowSize(width, height);
+            commandWorld.get_mut<Rendering::RenderTargetSize>().dimension = Vector2{
+                static_cast<float>(width),
+                static_cast<float>(height)};
             return CommandResult{
                 true,
                 "Window size set to " + std::to_string(width) + "x" + std::to_string(height)};
