@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include <utility>
 
@@ -26,8 +27,10 @@
 // constexpr int SCREEN_HEIGHT = 1080;
 // constexpr int SCREEN_WIDTH = 1600;
 // constexpr int SCREEN_HEIGHT = 900;
-constexpr int SCREEN_WIDTH = 1280;
-constexpr int SCREEN_HEIGHT = 720;
+// constexpr int SCREEN_WIDTH = 1280;
+// constexpr int SCREEN_HEIGHT = 720;
+constexpr int SCREEN_WIDTH = 640;
+constexpr int SCREEN_HEIGHT = 360;
 constexpr float CAMERA_ZOOM = 2.0f;
 
 static bool isDebugDrawEnabled = false;
@@ -61,6 +64,8 @@ static ecs_entity_t CreatePlayer(flecs::world &world) {
       .set<Character::IdleBehavior>({})
       .set<Character::SpriteSet>(std::move(playerSprites))
       .set<Rendering::Position>({playerStart})
+      .set<Rendering::PreviousPosition>({playerStart})
+      .set<Rendering::RenderPosition>({playerStart, playerStart})
       .set<Stairs::FloorState>({2.5f, 2.5f})
       .set<Movement::Velocity>({Vector2{0.0f, 0.0f}})
       .set<Movement::MoveSpeed>({100.0f})
@@ -70,7 +75,7 @@ static ecs_entity_t CreatePlayer(flecs::world &world) {
   auto &mainCamera = world.get_mut<GameCamera::MainCamera>();
   const auto &renderTargetSize = world.get<Rendering::RenderTargetSize>();
   mainCamera.value.offset = Vector2{renderTargetSize.dimension.x * 0.5f, renderTargetSize.dimension.y * 0.5f};
-  mainCamera.value.target = playerStart;
+  GameCamera::SnapTo(world, playerStart);
   return player.id();
 }
 
@@ -112,8 +117,6 @@ int main() {
   const auto sortedWorldDraw = buildPipeline<Rendering::Phases::SortedWorld>(world);
 
   const auto moveUpdate = buildPipeline<Movement::Phases::Update>(world);
-  const auto cameraFollow = buildPipeline<Movement::Phases::CameraFollow>(world);
-
   const auto characterUpdate = buildPipeline<Character::Phases::Update>(world);
 
   const auto prePhysics = buildPipeline<Simulation::PrePhysics>(world);
@@ -122,7 +125,7 @@ int main() {
   const auto fixedUpdate = buildPipeline<Simulation::FixedUpdate>(world);
 
   auto &renderTargetSize = world.get_mut<Rendering::RenderTargetSize>();
-  renderTargetSize.dimension = Vector2{static_cast<float>(SCREEN_WIDTH), static_cast<float>(SCREEN_HEIGHT)};
+  renderTargetSize.dimension = world.get<Rendering::RenderSettings>().sceneTargetSize;
   world.get_mut<GameCamera::MainCamera>().value.zoom = CAMERA_ZOOM;
 
   float fixedTimeStep = 1.0f / 60.0f;
@@ -189,16 +192,22 @@ int main() {
       const float simulationFrameTime = frameStepper.IsStepRequested() ? fixedTimeStep : frameTime;
       accumulator += simulationFrameTime;
       while (accumulator >= fixedTimeStep) {
+        Rendering::CapturePreviousPositions(world);
         ecs_run_pipeline(world, prePhysics, fixedTimeStep);
         ecs_run_pipeline(world, physicsStep, fixedTimeStep);
         ecs_run_pipeline(world, postPhysics, fixedTimeStep);
         ecs_run_pipeline(world, fixedUpdate, fixedTimeStep);
         ecs_run_pipeline(world, characterUpdate, fixedTimeStep);
-        ecs_run_pipeline(world, cameraFollow, fixedTimeStep);
         frameStepper.RecordFixedStep();
         accumulator -= fixedTimeStep;
       }
     }
+
+    const float renderAlpha = frameStepper.IsStepRequested() ? 1.0f : std::clamp(accumulator / fixedTimeStep, 0.0f, 1.0f);
+    Rendering::InterpolateRenderPositions(world, renderAlpha);
+    if (!loadingScreenVisible) Movement::UpdateCamera(world, frameTime);
+    const auto &renderCamera = world.get<GameCamera::MainCamera>();
+    Rendering::QuantizeRenderPositions(world, renderCamera.renderTarget, renderCamera.pixelsPerWorldUnit);
 
     Rendering::BeginFrame(world);
     GameCamera::Begin2D(world);

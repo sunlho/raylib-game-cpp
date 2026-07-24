@@ -19,16 +19,6 @@
 namespace Movement {
 namespace {
 
-constexpr float MinimumCameraZoom = 1.0e-4f;
-
-float CameraPixelScale(float zoom) {
-  return std::max(std::fabs(zoom), MinimumCameraZoom);
-}
-
-float SnapToScreenPixel(float value, float pixelScale) {
-  return roundf(value * pixelScale) / pixelScale;
-}
-
 float ClampAxisToBounds(float value, float halfExtent, float mapExtent) {
   if (mapExtent <= 0.0f) {
     return value;
@@ -119,51 +109,44 @@ module::module(flecs::world &world) {
         renderComponent.sortY = position.value.y + halfExtents.y;
       });
 
-  world.system<const Rendering::Position>("Follow Camera Target")
-      .with<CameraFollowTag>()
-      .kind<Movement::Phases::CameraFollow>()
-      .each([](flecs::iter &it, size_t i, const Rendering::Position &position) {
-        auto world = it.world();
-        auto &mainCamera = world.get_mut<GameCamera::MainCamera>();
-        const auto mapBounds = world.get<MapManager::MapBounds>();
-        const auto renderTargetSize = world.get<Rendering::RenderTargetSize>();
-        const bool snapTargetToPixel = mainCamera.snapTargetToPixel;
-        const float pixelScale = CameraPixelScale(mainCamera.value.zoom);
+}
 
-        const Vector2 viewportHalf = Vector2{
-            renderTargetSize.dimension.x * 0.5f / pixelScale,
-            renderTargetSize.dimension.y * 0.5f / pixelScale};
-
-        const Vector2 desiredTarget = Vector2Add(position.value, mainCamera.followOffset);
-        Vector2 clampedDesiredTarget = desiredTarget;
-        clampedDesiredTarget.x = ClampAxisToBounds(clampedDesiredTarget.x, viewportHalf.x, mapBounds.dimension.x);
-        clampedDesiredTarget.y = ClampAxisToBounds(clampedDesiredTarget.y, viewportHalf.y, mapBounds.dimension.y);
-
-        Vector2 target = SmoothCameraTarget(
-            mainCamera.value.target,
-            clampedDesiredTarget,
-            mainCamera.followSpeed,
-            it.delta_time());
-        target.x = ClampAxisToBounds(target.x, viewportHalf.x, mapBounds.dimension.x);
-        target.y = ClampAxisToBounds(target.y, viewportHalf.y, mapBounds.dimension.y);
-
-        if (snapTargetToPixel) {
-          target = Vector2{
-              SnapToScreenPixel(target.x, pixelScale),
-              SnapToScreenPixel(target.y, pixelScale)};
-          target.x = SnapToScreenPixel(ClampAxisToBounds(target.x, viewportHalf.x, mapBounds.dimension.x), pixelScale);
-          target.y = SnapToScreenPixel(ClampAxisToBounds(target.y, viewportHalf.y, mapBounds.dimension.y), pixelScale);
-        }
-
-        mainCamera.value.target = target;
-        mainCamera.useFollowRenderPosition = snapTargetToPixel && mainCamera.enabled;
-        const Vector2 playerFromCamera = Vector2Subtract(position.value, target);
-        mainCamera.followRenderPosition = Vector2Add(
-            target,
-            Vector2{
-                SnapToScreenPixel(playerFromCamera.x, pixelScale),
-                SnapToScreenPixel(playerFromCamera.y, pixelScale)});
-      });
+void UpdateCamera(flecs::world &world, float deltaTime) {
+  const auto player = world.lookup("Player");
+  if (!player.is_valid() || !player.has<Rendering::RenderPosition>()) return;
+  auto &camera = world.get_mut<GameCamera::MainCamera>();
+  const auto &settings = world.get<Rendering::RenderSettings>();
+  const auto &mapBounds = world.get<MapManager::MapBounds>();
+  Vector2 direction = camera.focus.direction;
+  float distance = 0.0f;
+  if (const auto *info = player.try_get<Character::CharacterInfo>()) {
+    switch (info->direction) {
+    case Character::CharacterDirection::Up: direction = {0.0f, -1.0f}; break;
+    case Character::CharacterDirection::Down: direction = {0.0f, 1.0f}; break;
+    case Character::CharacterDirection::Left: direction = {-1.0f, 0.0f}; break;
+    case Character::CharacterDirection::Right: direction = {1.0f, 0.0f}; break;
+    }
+    if (info->state == Character::CharacterState::Moving) distance = 7.0f;
+    if (info->state == Character::CharacterState::Attacking) distance = 3.0f;
+  }
+  if (const auto *run = player.try_get<RunState>(); run && run->active) distance = 10.0f;
+  const auto frameBlend = [deltaTime](float factor) {
+    return 1.0f - std::exp(std::log(1.0f - factor) * 60.0f * std::max(deltaTime, 0.0f));
+  };
+  camera.focus.direction = Vector2Normalize(Vector2Lerp(camera.focus.direction, direction, frameBlend(0.04f)));
+  camera.focus.distance += (distance - camera.focus.distance) * frameBlend(distance > camera.focus.distance ? 0.10f : 0.02f);
+  camera.focus.offset = Vector2Scale(camera.focus.direction, camera.focus.distance);
+  const Vector2 half = Vector2Scale(settings.logicalViewSize, 0.5f);
+  Vector2 desired = Vector2Add(player.get<Rendering::RenderPosition>().interpolated, camera.focus.offset);
+  desired.x = ClampAxisToBounds(desired.x, half.x, mapBounds.dimension.x);
+  desired.y = ClampAxisToBounds(desired.y, half.y, mapBounds.dimension.y);
+  camera.smoothTarget = SmoothCameraTarget(camera.smoothTarget, desired, camera.followSpeed, deltaTime);
+  camera.smoothTarget.x = ClampAxisToBounds(camera.smoothTarget.x, half.x, mapBounds.dimension.x);
+  camera.smoothTarget.y = ClampAxisToBounds(camera.smoothTarget.y, half.y, mapBounds.dimension.y);
+  const float steps = camera.pixelsPerWorldUnit;
+  camera.renderTarget = camera.snapToRenderGrid && steps > 0.0f
+      ? Vector2{std::round(camera.smoothTarget.x * steps) / steps, std::round(camera.smoothTarget.y * steps) / steps}
+      : camera.smoothTarget;
 }
 
 } // namespace Movement

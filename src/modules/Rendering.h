@@ -20,6 +20,21 @@ struct Position {
   Vector2 value;
 };
 
+struct PreviousPosition {
+  Vector2 value = {0.0f, 0.0f};
+};
+
+struct RenderPosition {
+  Vector2 interpolated = {0.0f, 0.0f};
+  Vector2 quantized = {0.0f, 0.0f};
+};
+
+struct RenderSettings {
+  Vector2 logicalViewSize = {640.0f, 360.0f};
+  Vector2 sceneTargetSize = {1280.0f, 720.0f};
+  float pixelsPerWorldUnit = 2.0f;
+};
+
 struct Renderable {
   virtual ~Renderable() = default;
   virtual void Draw(const Position &position) const = 0;
@@ -71,6 +86,11 @@ void SetLoadingRevealCenter(flecs::world &world, Vector2 center);
 void UpdateLoadingScreen(flecs::world &world, float deltaTime);
 bool IsLoadingScreenVisible(const flecs::world &world);
 bool IsLoadingSequenceActive(const flecs::world &world);
+
+void CapturePreviousPositions(flecs::world &world);
+void InterpolateRenderPositions(flecs::world &world, float alpha);
+void QuantizeRenderPositions(flecs::world &world, Vector2 renderCamera, float stepsPerWorldUnit);
+void ResetRenderPosition(flecs::entity entity, Vector2 position);
 
 void BeginFrame(flecs::world &world);
 void PresentFrame(flecs::world &world);

@@ -7,7 +7,6 @@ namespace Movement {
 
 struct Phases {
   struct Update {};
-  struct CameraFollow {};
 };
 
 struct Velocity {
@@ -30,6 +29,8 @@ struct RunState {
 
 struct PlayerControlled {};
 struct CameraFollowTag {};
+
+void UpdateCamera(flecs::world &world, float deltaTime);
 
 struct module {
   module(flecs::world &world);

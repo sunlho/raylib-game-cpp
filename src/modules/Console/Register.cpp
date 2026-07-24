@@ -51,7 +51,8 @@ void TeleportPlayer(flecs::world &world, float x, float y) {
     Physics::Relocate(player.get<Physics::PhysicsBody>(), destination, true);
   }
 
-  world.get_mut<GameCamera::MainCamera>().value.target = destination;
+  Rendering::ResetRenderPosition(player, destination);
+  GameCamera::SnapTo(world, destination);
 }
 
 } // namespace
@@ -132,7 +133,7 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
       {
           "resolution",
           "<0-4>",
-          "Set window size (1: 1280x720, 2: 1600x900, 3: 1920x1080, 4: 2560x1440)",
+          "Set window size (0: 640x360, 1: 1280x720, 2: 1600x900, 3: 1920x1080, 4: 2560x1440)",
           [](flecs::world &commandWorld, const std::vector<std::string> &arguments) {
             if (arguments.size() != 1) {
               return CommandResult{false, "Usage: resolution <1-4> (1: 1280x720, 2: 1600x900, 3: 1920x1080, 4: 2560x1440)"};
@@ -140,7 +141,10 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
 
             int width = 0;
             int height = 0;
-            if (arguments.front() == "1") {
+            if (arguments.front() == "0") {
+              width = 640;
+              height = 360;
+            } else if (arguments.front() == "1") {
               width = 1280;
               height = 720;
             } else if (arguments.front() == "2") {
@@ -157,9 +161,6 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
             }
 
             SetWindowSize(width, height);
-            commandWorld.get_mut<Rendering::RenderTargetSize>().dimension = Vector2{
-                static_cast<float>(width),
-                static_cast<float>(height)};
             return CommandResult{
                 true,
                 "Window size set to " + std::to_string(width) + "x" + std::to_string(height)};

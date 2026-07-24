@@ -5,6 +5,7 @@
 
 #include "Reflection.h"
 #include "Rendering.h"
+#include "raymath.h"
 
 namespace Rendering {
 namespace {
@@ -27,11 +28,12 @@ void DrawScaledRenderTarget(const RenderTexture2D &renderTarget, const Vector2 &
     return;
   }
 
-  const int scaleX = (screenWidth + targetWidth - 1) / targetWidth;
-  const int scaleY = (screenHeight + targetHeight - 1) / targetHeight;
-  const int scale = std::max(1, std::max(scaleX, scaleY));
-  const int destinationWidth = targetWidth * scale;
-  const int destinationHeight = targetHeight * scale;
+  const float fitScale = std::min(
+      screenWidth / static_cast<float>(targetWidth),
+      screenHeight / static_cast<float>(targetHeight));
+  const float scale = fitScale >= 1.0f ? std::floor(fitScale) : fitScale;
+  const int destinationWidth = std::max(1, static_cast<int>(std::round(targetWidth * scale)));
+  const int destinationHeight = std::max(1, static_cast<int>(std::round(targetHeight * scale)));
   const int offsetX = (screenWidth - destinationWidth) / 2;
   const int offsetY = (screenHeight - destinationHeight) / 2;
 
@@ -224,6 +226,39 @@ bool IsLoadingSequenceActive(const flecs::world &world) {
   return world.get<LoadingSequenceState>().active;
 }
 
+void CapturePreviousPositions(flecs::world &world) {
+  world.each([](const Position &position, PreviousPosition &previous) {
+    previous.value = position.value;
+  });
+}
+
+void InterpolateRenderPositions(flecs::world &world, float alpha) {
+  const float t = std::clamp(alpha, 0.0f, 1.0f);
+  world.each([t](const Position &position, const PreviousPosition &previous, RenderPosition &render) {
+    render.interpolated = Vector2{
+        previous.value.x + (position.value.x - previous.value.x) * t,
+        previous.value.y + (position.value.y - previous.value.y) * t};
+    render.quantized = render.interpolated;
+  });
+}
+
+void QuantizeRenderPositions(flecs::world &world, Vector2 renderCamera, float stepsPerWorldUnit) {
+  if (stepsPerWorldUnit <= 0.0f) {
+    return;
+  }
+  world.each([renderCamera, stepsPerWorldUnit](RenderPosition &render) {
+    const Vector2 relative = Vector2Subtract(render.interpolated, renderCamera);
+    render.quantized = Vector2Add(renderCamera, Vector2{
+        std::round(relative.x * stepsPerWorldUnit) / stepsPerWorldUnit,
+        std::round(relative.y * stepsPerWorldUnit) / stepsPerWorldUnit});
+  });
+}
+
+void ResetRenderPosition(flecs::entity entity, Vector2 position) {
+  entity.set<PreviousPosition>({position});
+  entity.set<RenderPosition>({position, position});
+}
+
 void BeginFrame(flecs::world &world) {
   auto &renderTarget = world.get_mut<RenderTexture2D>();
   const auto &renderTargetSize = world.get<RenderTargetSize>();
@@ -260,6 +295,11 @@ void EndFrame() {
 
 module::module(flecs::world &world) {
   Reflection::Register<Position>(world);
+  Reflection::Register<PreviousPosition>(world);
+  Reflection::Register<RenderPosition>(world);
+  Reflection::Register<RenderSettings>(world)
+      .add(flecs::Singleton)
+      .set<RenderSettings>({});
   Reflection::Register<Rectangle>(world);
   Reflection::Register<RenderComponent>(world);
   Reflection::Register<RenderTargetSize>(world)

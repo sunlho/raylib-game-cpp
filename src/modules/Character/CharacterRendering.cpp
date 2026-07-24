@@ -58,13 +58,8 @@ void CharacterRenderable::Draw(const Rendering::Position &position) const {
 
   Rectangle src = {0.0f, 0.0f, static_cast<float>(animation.width), static_cast<float>(animation.height)};
   Vector2 renderPosition = position.value;
-  bool positionIsScreenPixelAligned = false;
-  if (entity_.has<Movement::CameraFollowTag>()) {
-    const auto &mainCamera = entity_.world().get<GameCamera::MainCamera>();
-    if (mainCamera.useFollowRenderPosition) {
-      renderPosition = mainCamera.followRenderPosition;
-      positionIsScreenPixelAligned = true;
-    }
+  if (const auto *render = entity_.try_get<Rendering::RenderPosition>()) {
+    renderPosition = render->quantized;
   }
 
   Rectangle dest = {
@@ -72,10 +67,6 @@ void CharacterRenderable::Draw(const Rendering::Position &position) const {
       renderPosition.y,
       static_cast<float>(animation.width) * spriteSet.scale,
       static_cast<float>(animation.height) * spriteSet.scale};
-  if (!positionIsScreenPixelAligned) {
-    dest.x = roundf(dest.x);
-    dest.y = roundf(dest.y);
-  }
   Vector2 origin = spriteSet.useCenterOrigin ? Vector2{roundf(dest.width * 0.5f), roundf(dest.height * 0.5f)} : spriteSet.origin;
 
   DrawTexturePro(animation.texture, src, dest, origin, 0.0f, WHITE);
