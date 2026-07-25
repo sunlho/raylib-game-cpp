@@ -118,64 +118,9 @@ module::module(flecs::world &world) {
         renderComponent.sortY = position.value.y + halfExtents.y;
       });
 
-  world.system<const Rendering::Position>("Follow Camera Target")
-      .with<CameraFollowTag>()
-      .kind<Movement::Phases::CameraFollow>()
-      .each([](flecs::iter &it, size_t i, const Rendering::Position &position) {
-        auto world = it.world();
-        auto &mainCamera = world.get_mut<GameCamera::MainCamera>();
-        const auto mapBounds = world.get<MapManager::MapBounds>();
-        const auto renderTargetSize = world.get<Rendering::RenderTargetSize>();
-        const bool snapTargetToPixel = mainCamera.snapTargetToPixel;
-
-        const Vector2 viewportHalf = Vector2{
-            renderTargetSize.dimension.x * 0.5f,
-            renderTargetSize.dimension.y * 0.5f};
-
-        const Vector2 desiredTarget = Vector2Add(position.value, mainCamera.followOffset);
-        Vector2 target = desiredTarget;
-        target.x = ClampAxisToBounds(target.x, viewportHalf.x, mapBounds.dimension.x);
-        target.y = ClampAxisToBounds(target.y, viewportHalf.y, mapBounds.dimension.y);
-        const bool targetClampedX = target.x != desiredTarget.x;
-        const bool targetClampedY = target.y != desiredTarget.y;
-
-        if (snapTargetToPixel) {
-          Vector2 snappedTarget = {roundf(target.x), roundf(target.y)};
-
-          if (mainCamera.hasPreviousFollowTarget) {
-            const Vector2 followDelta = Vector2Subtract(target, mainCamera.previousFollowTarget);
-            if (IsEqualMagnitudeDiagonal(followDelta)) {
-              const Vector2 signs = {
-                  DirectionSign(followDelta.x),
-                  DirectionSign(followDelta.y)};
-              const Vector2 remaining = Vector2Subtract(target, mainCamera.value.target);
-              const float sharedStep = roundf(
-                  (remaining.x * signs.x + remaining.y * signs.y) * 0.5f);
-              snappedTarget = Vector2Add(
-                  mainCamera.value.target,
-                  Vector2Scale(signs, sharedStep));
-            }
-          }
-
-          target = snappedTarget;
-          target.x = roundf(ClampAxisToBounds(target.x, viewportHalf.x, mapBounds.dimension.x));
-          target.y = roundf(ClampAxisToBounds(target.y, viewportHalf.y, mapBounds.dimension.y));
-        }
-
-        mainCamera.previousFollowTarget = Vector2{
-            ClampAxisToBounds(desiredTarget.x, viewportHalf.x, mapBounds.dimension.x),
-            ClampAxisToBounds(desiredTarget.y, viewportHalf.y, mapBounds.dimension.y)};
-        mainCamera.hasPreviousFollowTarget = true;
-        mainCamera.value.target = target;
-        mainCamera.useFollowRenderPosition = snapTargetToPixel && mainCamera.enabled;
-        mainCamera.followRenderPosition = Vector2{
-            targetClampedX
-                ? roundf(position.value.x)
-                : roundf(target.x - mainCamera.followOffset.x),
-            targetClampedY
-                ? roundf(position.value.y)
-                : roundf(target.y - mainCamera.followOffset.y)};
-      });
+  // Camera follow is now handled per render frame in main.cpp via
+  // GameCamera::UpdateRenderCamera(), not inside the fixed simulation loop.
+  // The CameraFollow phase is kept for API compatibility but has no systems.
 }
 
 } // namespace Movement

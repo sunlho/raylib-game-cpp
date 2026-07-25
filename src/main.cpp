@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include <utility>
 
@@ -62,16 +63,16 @@ static ecs_entity_t CreatePlayer(flecs::world &world) {
       .set<Character::IdleBehavior>({})
       .set<Character::SpriteSet>(std::move(playerSprites))
       .set<Rendering::Position>({playerStart})
+      .set<Rendering::PreviousPosition>({playerStart})
+      .set<Rendering::RenderPosition>({playerStart, playerStart})
       .set<Stairs::FloorState>({2.5f, 2.5f})
       .set<Movement::Velocity>({Vector2{0.0f, 0.0f}})
       .set<Movement::MoveSpeed>({100.0f})
       .set<Movement::RunSettings>({1.6f, 0.2f})
       .set<Movement::RunState>({});
 
-  auto &mainCamera = world.get_mut<GameCamera::MainCamera>();
-  const auto &renderTargetSize = world.get<Rendering::RenderTargetSize>();
-  mainCamera.value.offset = Vector2{renderTargetSize.dimension.x * 0.5f, renderTargetSize.dimension.y * 0.5f};
-  mainCamera.value.target = playerStart;
+  // Snap the camera to the player spawn so it doesn't fly in from {0,0}.
+  GameCamera::SnapCameraTo(world, playerStart);
   return player.id();
 }
 
@@ -81,9 +82,13 @@ static void UpdateLoadingRevealCenter(flecs::world &world) {
     return;
   }
 
-  const auto &position = player.get<Rendering::Position>();
+  // Use quantised render position for the reveal centre when available so the
+  // circle follows the pixel-aligned player position.
+  const auto *rp = player.try_get<Rendering::RenderPosition>();
+  const auto &pos = player.get<Rendering::Position>();
+  const Vector2 worldPos = rp ? rp->quantized : pos.value;
   const auto &mainCamera = world.get<GameCamera::MainCamera>();
-  Rendering::SetLoadingRevealCenter(world, GetWorldToScreen2D(position.value, mainCamera.value));
+  Rendering::SetLoadingRevealCenter(world, GetWorldToScreen2D(worldPos, mainCamera.value));
 }
 
 int main() {
@@ -113,7 +118,8 @@ int main() {
   const auto sortedWorldDraw = buildPipeline<Rendering::Phases::SortedWorld>(world);
 
   const auto moveUpdate = buildPipeline<Movement::Phases::Update>(world);
-  const auto cameraFollow = buildPipeline<Movement::Phases::CameraFollow>(world);
+  // cameraFollow pipeline kept for ECS phase completeness; no systems run in it.
+  [[maybe_unused]] const auto cameraFollow = buildPipeline<Movement::Phases::CameraFollow>(world);
 
   const auto characterUpdate = buildPipeline<Character::Phases::Update>(world);
 
@@ -122,8 +128,13 @@ int main() {
   const auto postPhysics = buildPipeline<Simulation::PostPhysics>(world);
   const auto fixedUpdate = buildPipeline<Simulation::FixedUpdate>(world);
 
+  // Scene render-target is fixed at 1280x720 regardless of window size.
+  // The logical view (visible world units) is derived from this: 1280/zoom x 720/zoom = 640x360.
   auto &renderTargetSize = world.get_mut<Rendering::RenderTargetSize>();
-  renderTargetSize.dimension = Vector2{static_cast<float>(BASE_WIDTH), static_cast<float>(BASE_HEIGHT)};
+  renderTargetSize.dimension = Vector2{1280.0f, 720.0f};
+
+  auto &logicalView = world.get_mut<Rendering::LogicalViewSize>();
+  logicalView.value = Vector2{640.0f, 360.0f};
 
   float fixedTimeStep = 1.0f / 60.0f;
   float accumulator = 0.0f;
@@ -187,17 +198,45 @@ int main() {
 
     if (!loadingScreenVisible && frameStepper.ShouldAdvanceSimulation()) {
       const float simulationFrameTime = frameStepper.IsStepRequested() ? fixedTimeStep : frameTime;
-      accumulator += simulationFrameTime;
+      // Cap the accumulated time to avoid a death spiral after a long stall
+      // (e.g. window drag or debugger pause).
+      accumulator += std::min(simulationFrameTime, 0.25f);
       while (accumulator >= fixedTimeStep) {
+        // Snapshot positions BEFORE physics so the interpolation range is
+        // [previous tick end, current tick end], not [current, next].
+        world.each([](const Rendering::Position &pos, Rendering::PreviousPosition &prev) {
+          prev.value = pos.value;
+        });
+
         ecs_run_pipeline(world, prePhysics, fixedTimeStep);
         ecs_run_pipeline(world, physicsStep, fixedTimeStep);
         ecs_run_pipeline(world, postPhysics, fixedTimeStep);
         ecs_run_pipeline(world, fixedUpdate, fixedTimeStep);
         ecs_run_pipeline(world, characterUpdate, fixedTimeStep);
-        ecs_run_pipeline(world, cameraFollow, fixedTimeStep);
+        // cameraFollow removed: camera is now updated per render frame below.
         frameStepper.RecordFixedStep();
         accumulator -= fixedTimeStep;
       }
+    }
+
+    // --- Per-render-frame render preparation ---
+    // 1. Interpolate simulation positions.
+    const float renderAlpha = std::clamp(accumulator / fixedTimeStep, 0.0f, 1.0f);
+    if (!loadingScreenVisible) {
+      Rendering::InterpolatePositions(world, renderAlpha);
+
+      // 2. Update the smooth camera using the interpolated player position.
+      //    Must happen before QuantizeRenderPositions so camera.renderTarget is ready.
+      const auto playerEntity = world.lookup("Player");
+      if (playerEntity.is_valid()) {
+        const auto *rp = playerEntity.try_get<Rendering::RenderPosition>();
+        if (rp) {
+          GameCamera::UpdateRenderCamera(world, rp->interpolated, frameTime);
+        }
+      }
+
+      // 3. Quantise all dynamic entities relative to the final camera position.
+      Rendering::QuantizeRenderPositions(world);
     }
 
     Rendering::BeginFrame(world);

@@ -131,7 +131,14 @@ void RegisterMapRendering(flecs::world &world) {
           auto renderComponent = it.field<const Rendering::RenderComponent>(1);
 
           for (auto i : it) {
-            sortData.push_back(RenderableSortData{position[i], &renderComponent[i]});
+            // For dynamic entities, use the camera-relative quantised render
+            // position (set by Rendering::PrepareRenderFrame) so they share the
+            // same pixel grid as every other dynamic object.
+            const Rendering::RenderPosition *rp = it.entity(i).try_get<Rendering::RenderPosition>();
+            const Rendering::Position drawPos = rp
+                                                    ? Rendering::Position{rp->quantized}
+                                                    : position[i];
+            sortData.push_back(RenderableSortData{drawPos, &renderComponent[i]});
           }
         }
 

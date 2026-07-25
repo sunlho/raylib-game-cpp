@@ -3,6 +3,7 @@
 #include <deque>
 #include <utility>
 
+#include "Camera.h"
 #include "Reflection.h"
 #include "Rendering.h"
 
@@ -27,9 +28,10 @@ void DrawScaledRenderTarget(const RenderTexture2D &renderTarget, const Vector2 &
     return;
   }
 
-  const int scaleX = (screenWidth + targetWidth - 1) / targetWidth;
-  const int scaleY = (screenHeight + targetHeight - 1) / targetHeight;
-  const int scale = std::max(1, std::max(scaleX, scaleY));
+  // Integer nearest fit: largest whole-number scale that keeps the entire
+  // scene target visible inside the window (letterbox, no crop).
+  const int scale = std::max(1, static_cast<int>(std::floor(std::min(static_cast<float>(screenWidth) / static_cast<float>(targetWidth), static_cast<float>(screenHeight) / static_cast<float>(targetHeight)))));
+
   const int destinationWidth = targetWidth * scale;
   const int destinationHeight = targetHeight * scale;
   const int offsetX = (screenWidth - destinationWidth) / 2;
@@ -260,8 +262,13 @@ void EndFrame() {
 
 module::module(flecs::world &world) {
   Reflection::Register<Position>(world);
+  Reflection::Register<PreviousPosition>(world);
+  Reflection::Register<RenderPosition>(world);
   Reflection::Register<Rectangle>(world);
   Reflection::Register<RenderComponent>(world);
+  Reflection::Register<LogicalViewSize>(world)
+      .add(flecs::Singleton)
+      .set<LogicalViewSize>({});
   Reflection::Register<RenderTargetSize>(world)
       .add(flecs::Singleton)
       .set<RenderTargetSize>({});
@@ -281,13 +288,36 @@ module::module(flecs::world &world) {
   world.system<const Position, const RenderComponent>("Draw Renderables")
       .kind<Phases::World>()
       .without<SortableTag>()
-      .each([](const Position &p, const RenderComponent &renderable) {
+      .each([](flecs::entity e, const Position &p, const RenderComponent &renderable) {
         if (!renderable.visible || !renderable.object) {
           return;
         }
-
-        renderable.object->Draw(p);
+        // Use quantised render position when available; fall back to sim position.
+        const RenderPosition *rp = e.try_get<RenderPosition>();
+        const Position drawPos = rp ? Position{rp->quantized} : p;
+        renderable.object->Draw(drawPos);
       });
+}
+
+void PrepareRenderFrame(flecs::world &world, float alpha) {
+  InterpolatePositions(world, alpha);
+  QuantizeRenderPositions(world);
+}
+
+void InterpolatePositions(flecs::world &world, float alpha) {
+  world.each([alpha](const Position &current, const PreviousPosition &previous, RenderPosition &rp) {
+    rp.interpolated = Vector2Lerp(previous.value, current.value, alpha);
+  });
+}
+
+void QuantizeRenderPositions(flecs::world &world) {
+  const auto &camera = world.get<GameCamera::MainCamera>();
+  const Vector2 renderCam = camera.renderTarget;
+  const float ppwu = camera.pixelsPerWorldUnit;
+
+  world.each([renderCam, ppwu](RenderPosition &rp) {
+    rp.quantized = QuantizeForCamera(rp.interpolated, renderCam, ppwu);
+  });
 }
 
 } // namespace Rendering
