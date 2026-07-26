@@ -52,11 +52,8 @@ void ClearMapData(flecs::world &world) {
 void SpawnStairs(flecs::world &world, const Tilemap::LoadedMap &loadedMap, flecs::entity mapRoot) {
   for (std::size_t stairIndex = 0; stairIndex < loadedMap.stairs.size(); ++stairIndex) {
     const std::string stairName = std::format("MapStair_{}", stairIndex);
-    auto stairEntity = world.entity(stairName.c_str());
 
-    if (mapRoot.is_valid()) {
-      stairEntity.add(flecs::ChildOf, mapRoot);
-    }
+    auto stairEntity = mapRoot.is_valid() ? world.entity(flecs::Parent{mapRoot}, stairName.c_str()) : world.entity(stairName.c_str());
 
     stairEntity.set<Stairs::StairData>(loadedMap.stairs[stairIndex]);
   }
@@ -66,11 +63,8 @@ flecs::entity EnsureLayerGroup(flecs::world &world, std::unordered_map<int, flec
   auto [groupIt, inserted] = layerGroups.try_emplace(layerIndex);
   if (inserted) {
     const std::string layerName = "MapLayer_" + std::to_string(layerIndex);
-    auto layerEntity = world.entity(layerName.c_str());
 
-    if (mapRoot.is_valid()) {
-      layerEntity.add(flecs::ChildOf, mapRoot);
-    }
+    auto layerEntity = mapRoot.is_valid() ? world.entity(flecs::Parent{mapRoot}, layerName.c_str()) : world.entity(layerName.c_str());
 
     groupIt->second = layerEntity;
   }
