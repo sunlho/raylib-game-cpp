@@ -9,6 +9,7 @@
 #include "Map.h"
 #include "MapInternal.h"
 
+#include "modules/Camera.h"
 #include "modules/Stairs/Stairs.h"
 #include "modules/Tilemap/Tilemap.h"
 
@@ -183,6 +184,15 @@ void LoadMapFromPath(flecs::world &world, const std::string &path) {
   auto &worldBounds = world.get_mut<Core::WorldBounds>();
   worldBounds.dimension = loadedMap->dimensions;
   world.modified<Core::WorldBounds>();
+
+  // The camera clamps against WorldBounds, so its smoothed state is stale the
+  // moment the bounds change: leaving it alone makes the camera fly over from
+  // wherever it was on the previous map, and a smaller map leaves it out of
+  // bounds until the damping catches up. No player yet on the very first load --
+  // main() snaps the camera when it spawns one.
+  if (const auto player = world.lookup("Player"); player.is_valid() && player.has<Core::Position>()) {
+    GameCamera::SnapCameraTo(world, player.get<Core::Position>().value);
+  }
 
   auto &activeData = world.get_mut<ActiveMapData>();
   activeData.textureBank = loadedMap->textureBank;

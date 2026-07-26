@@ -52,7 +52,29 @@ void TeleportPlayer(flecs::world &world, float x, float y) {
     Physics::Relocate(player.get<Physics::PhysicsBody>(), destination, true);
   }
 
-  world.get_mut<GameCamera::MainCamera>().value.target = destination;
+  // A teleport is a discontinuity, so the interpolation range has to collapse
+  // onto the destination. Otherwise the next InterpolatePositions still blends
+  // from the pre-teleport sample and the player slides across the whole jump.
+  if (player.has<Core::PreviousPosition>()) {
+    player.get_mut<Core::PreviousPosition>().value = destination;
+  }
+
+  // SnapCameraTo, not value.target: a raw write is unclamped (the camera can end
+  // up showing outside the map) and UpdateRenderCamera overwrites it from
+  // smoothTarget on the next render frame, which then flies over from the
+  // pre-teleport position.
+  GameCamera::SnapCameraTo(world, destination);
+
+  // The loading screen suppresses InterpolatePositions/QuantizeRenderPositions
+  // for as long as it is visible, and a teleport runs from inside a loading
+  // step. Without writing the render position here the player stays drawn at the
+  // old spot until the reveal finishes.
+  if (player.has<Core::RenderPosition>()) {
+    const auto &camera = world.get<GameCamera::MainCamera>();
+    auto &renderPosition = player.get_mut<Core::RenderPosition>();
+    renderPosition.interpolated = destination;
+    renderPosition.quantized = Core::QuantizeForCamera(destination, camera.renderTarget, camera.pixelsPerWorldUnit);
+  }
 }
 
 } // namespace
