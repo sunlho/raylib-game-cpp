@@ -72,11 +72,12 @@ Vector2 ClampCameraToMap(Vector2 target, Vector2 logicalViewSize, Vector2 mapSiz
 void Begin2D(flecs::world &world) {
   auto &mainCamera = world.get_mut<MainCamera>();
   if (mainCamera.autoCenterOffset) {
-    // Offset is in scene-render-target pixels: always half of the fixed 1280x720 target.
+    // Offset is in scene-buffer pixels: the centre of the guarded buffer, so
+    // renderTarget lands exactly on the middle of the visible scene area.
     const auto &renderTargetSize = world.get<Rendering::RenderTargetSize>();
     mainCamera.value.offset = Vector2{
-        renderTargetSize.dimension.x * 0.5f,
-        renderTargetSize.dimension.y * 0.5f};
+        renderTargetSize.dimension.x * 0.5f + Rendering::kSceneGuardPixels,
+        renderTargetSize.dimension.y * 0.5f + Rendering::kSceneGuardPixels};
   }
 
   if (mainCamera.enabled) {
@@ -121,14 +122,48 @@ void UpdateRenderCamera(flecs::world &world, Vector2 interpolatedPlayerPos, floa
   camera.smoothTarget = Vector2Lerp(camera.smoothTarget, desired, blend);
   camera.smoothTarget = ClampCameraToMap(camera.smoothTarget, viewSize, mapSize);
 
-  // --- Quantise to render grid ---
+  // --- Quantise to the render grid, keeping the residual for the final blit ---
   if (camera.snapToRenderGrid) {
-    camera.renderTarget = Rendering::SnapToGrid(camera.smoothTarget, camera.pixelsPerWorldUnit);
-    camera.renderTarget = ClampCameraToMap(camera.renderTarget, viewSize, mapSize);
-    // Second snap after clamp, in case the map boundary is not on a 0.5-unit multiple.
-    camera.renderTarget = Rendering::SnapToGrid(camera.renderTarget, camera.pixelsPerWorldUnit);
+    const float ppwu = camera.pixelsPerWorldUnit;
+
+    // How many output pixels one scene pixel becomes in the current window.
+    const auto &sceneSize = world.get<Rendering::RenderTargetSize>().dimension;
+    const bool integerOnly =
+        world.get<Rendering::OutputSettings>().mode == Rendering::OutputScaleMode::Integer;
+    const Rectangle outputRect = Rendering::ComputeOutputRect(
+        GetScreenWidth(), GetScreenHeight(), sceneSize, integerOnly);
+    const float outputScale = (sceneSize.y > 0.0f && outputRect.height > 0.0f)
+                                  ? outputRect.height / sceneSize.y
+                                  : 1.0f;
+    const float outputSteps = std::max(1.0f, std::round(outputScale));
+
+    // fine: finest grid the output can actually show (one output pixel).
+    // coarse: what the scene buffer can render (one scene pixel).
+    const Vector2 fine = Rendering::SnapToGrid(camera.smoothTarget, ppwu * outputSteps);
+    const Vector2 unclamped = Rendering::SnapToGrid(fine, ppwu);
+    Vector2 coarse = ClampCameraToMap(unclamped, viewSize, mapSize);
+    // Second snap after clamp, in case the map boundary is not on a grid multiple.
+    coarse = Rendering::SnapToGrid(coarse, ppwu);
+
+    camera.renderTarget = coarse;
+
+    // Translate the blit by the discarded remainder. Skipped while the camera is
+    // held against a map edge: there the remainder is an artefact of clamping,
+    // and shifting would pull guard pixels from outside the map into view. The
+    // camera is not moving there either, so there is no jitter to compensate.
+    const bool clampedToEdge = coarse.x != unclamped.x || coarse.y != unclamped.y;
+    if (clampedToEdge) {
+      camera.renderShift = {0.0f, 0.0f};
+    } else {
+      const Vector2 residual = Vector2Subtract(coarse, fine);
+      const float guard = Rendering::kSceneGuardPixels * outputScale;
+      camera.renderShift = {
+          std::clamp(std::round(residual.x * ppwu * outputScale), -guard, guard),
+          std::clamp(std::round(residual.y * ppwu * outputScale), -guard, guard)};
+    }
   } else {
     camera.renderTarget = camera.smoothTarget;
+    camera.renderShift = {0.0f, 0.0f};
   }
 
   camera.value.target = camera.renderTarget;
@@ -157,6 +192,7 @@ void SnapCameraTo(flecs::world &world, Vector2 focus) {
   camera.renderTarget = camera.snapToRenderGrid
                             ? Rendering::SnapToGrid(clamped, camera.pixelsPerWorldUnit)
                             : clamped;
+  camera.renderShift = {0.0f, 0.0f};
   camera.value.target = camera.renderTarget;
 
   camera.focus = FocusProxy{};

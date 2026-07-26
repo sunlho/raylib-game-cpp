@@ -26,7 +26,7 @@ struct MainCamera {
       Vector2{0.0f, 0.0f}, // offset  set in Begin2D to scene-target centre
       Vector2{0.0f, 0.0f}, // target  overwritten each frame by renderTarget
       0.0f,                // rotation
-      2.0f};               // zoom  2x makes 1 scene pixel == 0.5 world unit
+      2.0f};               // zoom  set by Rendering::SetSceneResolution (2 = Full, 1 = Half)
 
   bool enabled = true;
   bool autoCenterOffset = true;
@@ -37,9 +37,16 @@ struct MainCamera {
   // Continuous float camera state. Never quantised; never written back to physics.
   Vector2 smoothTarget = {0.0f, 0.0f};
 
-  // Final per-frame camera position snapped to the render pixel grid.
+  // Final per-frame camera position snapped to the scene pixel grid ("coarse").
   // This is the only value written to Camera2D.target.
   Vector2 renderTarget = {0.0f, 0.0f};
+
+  // Residual compensation: the part of the camera position that renderTarget
+  // had to discard, expressed as a whole number of OUTPUT pixels. The final
+  // blit is translated by this, so the camera effectively moves on a
+  // 1/outputScale scene-pixel grid instead of a whole scene pixel. Because the
+  // whole image shifts together, no relative jitter is introduced.
+  Vector2 renderShift = {0.0f, 0.0f};
 
   // Look-ahead proxy  updated every render frame before camera smoothing.
   FocusProxy focus{};
@@ -48,8 +55,9 @@ struct MainCamera {
   // 5.66 ydy Eastward's k=0.09 per 60 Hz reference frame converted to lambda.
   float followSpeed = 5.66f;
 
-  // Quantisation: world units per render pixel = zoom / 1.
-  // At zoom 2 this is 2.0  snaps to 0.5 world-unit grid.
+  // Scene pixels per world unit; always equal to value.zoom. Kept separate so
+  // quantisation never depends on an accidental match. Set by
+  // Rendering::SetSceneResolution: 2 -> 0.5 world-unit grid, 1 -> 1.0.
   float pixelsPerWorldUnit = 2.0f;
 
   // Set false to skip snap (useful for debug free-camera or cutscenes).

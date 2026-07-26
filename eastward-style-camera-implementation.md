@@ -622,9 +622,21 @@ int offsetY = (windowHeight - destinationHeight) / 2;
 
 ### 11.3 非整数倍率的 PixZoom 路径
 
-`1600x900` 是 1.25x，`1920x1080` 是 1.5x。普通 nearest 会产生不均匀像素宽度，普通 bilinear 会整体模糊。可以增加一个 sharp-bilinear shader，使像素内部保持大面积平坦，只在非整数像素边缘的窄区域混合。
+`1600x900` 是 1.25x，`1920x1080` 是 1.5x。普通 nearest 会产生不均匀像素宽度，普通 bilinear 会整体模糊。正确做法是 sharp-bilinear：像素内部保持大面积平坦，只在纹素边界一个输出像素宽的窄带内混合。
 
-以下 GLSL 330 片段可作为 Raylib 实现起点：
+`PixZoom2` 的实现不再需要推断。解包资源里有完整源码：`asset/shader/screen/PixZoom2.shader_script`（`game/asset/script/EWGlobalManager.lua` 通过 `mock.buildShader(...)` 加载）。原始片段核心为：
+
+```glsl
+MEDP vec2 p = fract( pixPos );                  // pixPos = uv * vec2( srcWidth, srcHeight )
+float ix = clamp( p.x * scale, 0.0, 0.5 ) + clamp( ( p.x - 1.0 ) * scale + 0.5, 0.0, 0.5 );
+float iy = clamp( p.y * scale, 0.0, 0.5 ) + clamp( ( p.y - 1.0 ) * scale + 0.5, 0.0, 0.5 );
+MEDP vec2 uv2 = ( floor( pixPos ) + vec2( ix, iy ) ) / vec2( srcWidth, srcHeight );
+FragColor = texture( _sampler_, uv2 );
+```
+
+参数由 Lua 侧设置：`srcWidth = 1280`、`srcHeight = 720`，`scale = deviceHeight / 720`（全屏时再乘 `fullscreenScale`）。也就是说 `scale` 是最终输出相对场景缓冲的倍率，可以是 1.25、1.5 这类非整数；混合带宽度恰好是 `1/scale` 个源纹素，即一个输出像素。
+
+对应的 GLSL 330 / Raylib 移植（本工程 `src/modules/Rendering.cpp` 中的 `kPixZoomFragmentShader`）：
 
 ```glsl
 #version 330
@@ -634,21 +646,17 @@ in vec4 fragColor;
 
 uniform sampler2D texture0;
 uniform vec4 colDiffuse;
-uniform vec2 sourceSize;
-uniform vec2 outputSize;
+uniform vec2 srcSize;
+uniform float scale;   // destinationHeight / sceneTargetHeight
 
 out vec4 finalColor;
 
 void main() {
-    vec2 scale = max(outputSize / sourceSize, vec2(1.0));
-    vec2 texel = fragTexCoord * sourceSize;
-    vec2 centerDistance = fract(texel) - 0.5;
-    vec2 blendLimit = 0.5 - 0.5 / scale;
-
-    vec2 adjusted =
-        (centerDistance - clamp(centerDistance, -blendLimit, blendLimit))
-        * scale + 0.5;
-    vec2 uv = (floor(texel) + adjusted) / sourceSize;
+    vec2 pixPos = fragTexCoord * srcSize;
+    vec2 p = fract(pixPos);
+    float ix = clamp(p.x * scale, 0.0, 0.5) + clamp((p.x - 1.0) * scale + 0.5, 0.0, 0.5);
+    float iy = clamp(p.y * scale, 0.0, 0.5) + clamp((p.y - 1.0) * scale + 0.5, 0.0, 0.5);
+    vec2 uv = (floor(pixPos) + vec2(ix, iy)) / srcSize;
 
     finalColor = texture(texture0, uv) * colDiffuse * fragColor;
 }
@@ -658,15 +666,139 @@ void main() {
 
 - 场景 target 尺寸仍固定。
 - destination 使用保持 16:9 的 fit 矩形，不要 cover 裁切。
-- 场景纹理需要 linear 采样，由 shader 控制混合区域。
+- 场景纹理需要 linear 采样（`TEXTURE_FILTER_BILINEAR`），混合区域由 shader 控制；同时把 wrap 设为 clamp，避免最外圈纹素跨边界取样。
+- `scale < 1`（窗口小于场景缓冲）时公式自动退化为普通 bilinear，不会出错。
 - sprite atlas 本身仍应避免边缘串色，必要时加入 padding/extrusion。
 - shader 只处理最终场景复制，不要给每张 sprite 单独套普通 bilinear。
 
-这个 shader 是可移植的 sharp-bilinear 起点，不应声称与未公开的 `PixZoom2` 指令级完全一致；应通过目标分辨率截图再调整采样中心。
+### 11.4 原游戏的三种放大模式
 
-## 12. 可选 Half 模式：残差补偿
+Eastward 设置项 `scale_mode`（UI 上为 "Enlarge Mode"）对应三种最终输出策略，窗口尺寸本身由 `window_size`（16:9 的高度值，如 720/900/1080）和 `fullscreen` 控制，场景缓冲始终是 `1280x720`：
 
-只有在 Full 基线稳定后再实现这一层。
+| 设置值 | 行为 |
+| --- | --- |
+| `clear` | 默认；锐利放大（PixZoom sharp-bilinear 路径） |
+| `smooth` | 场景缓冲固定 `1280x720`，直接 linear 拉伸，整体偏软 |
+| `crt` | 额外套 `CRTView2` shader |
+
+本工程对应的实现是 `Rendering::OutputScaleMode`（`sharp` / `smooth` / `integer`）与控制台 `scalemode` 命令；`integer` 是原游戏没有的额外选项，适合需要严格 pixel-perfect 的截图场景。
+
+## 12. Half 模式
+
+### 12.0 一张缓冲只有一个亚像素相位
+
+残差补偿有一个绕不开的限制，实现前必须理解：**所有物体都画进同一张场景缓冲，只能落在整场景像素上；残差平移的是整幅画面，因此相机和所有物体共享同一个亚像素相位。**
+
+于是背景和角色只能平滑一个：
+
+```text
+角色屏幕位置 = (round(P) - fine) * zoom * scale
+背景屏幕位置 = (w      - fine) * zoom * scale      // w 是整数世界坐标
+```
+
+`round(P) - P` 是幅度一个场景像素的锯齿。要背景平滑就得 `fine ≈ smoothTarget`（当前实现），此时锯齿全部落在角色身上；要角色平滑就得 `fine ≈ smoothTarget + (round(P) - P)`，锯齿转移到背景。两者不可兼得。
+
+Half 基准下这个锯齿是 **1 个美术像素**（1080p 下 3 个输出像素），非常显眼。真正的出路是提高缓冲密度，让锯齿本身小于一个输出像素 —— 这就是 `native` 模式，也是原游戏 `scale_mode = clear` 的默认行为（`setOutputFilter` 里非 smooth 分支把 render target 设为 `relative`，即跟随设备分辨率）。
+
+| 模式 | 场景缓冲 | 角色量化误差上限 | 1080p 下的可见抖动 |
+| --- | --- | --- | --- |
+| `half` | 640x360 | 0.5 美术像素 | 3 输出像素 |
+| `full` | 1280x720 | 0.25 美术像素 | 1.5 输出像素 |
+| `native` | 跟随窗口 | **0.5 输出像素** | **亚像素，不可见** |
+
+`native` 下 zoom = `floor(min(winW/640, winH/360))`（用 floor 而非 round，保证最终 blit 只会放大不会缩小），缓冲 = `640x360 * zoom`。窗口是整数倍时 blit 就是 1:1，完全没有重采样；此时残差补偿自动失效（`outputSteps = 1`），因为已经没有比一个输出像素更细的东西可补。
+
+实测（F7 单步、按住 D 匀速直走、1280x720 窗口，测"角色左边缘 − 静态土路边缘"的每 tick 变化，理想值 100/60*2 = 3.33 px）：
+
+| 模式 | 每 tick 变化 | 栅格 |
+| --- | --- | --- |
+| `half` + 残差 | 4, 2, 4, 4, 2, 4, 4, 2, 4 … | 2 px（只有偶数） |
+| `native` | **3, 3, 4, 3, 3, 4, 3, 3, 4 …** | **1 px** |
+
+`native` 的偏差被压到 ±0.5 px 并且是规整的周期 3 图案。
+
+### 12.0.1 当前实现状态
+
+默认是 `native`，可用控制台 `sceneres [native|full|half]` 运行时切换：
+
+```cpp
+Rendering::SetSceneResolution(world, Rendering::SceneResolution::Half);
+```
+
+切换时 `RenderTargetSize = LogicalViewSize * zoom`，同时改写 `Camera2D.zoom` 和 `pixelsPerWorldUnit`，并把 `renderTarget` 重新对齐到新栅格（`smoothTarget` 保留浮点，不动）。
+
+选择 Half 作为默认的依据：tile 的 `destRect` 宽高等于 tileset 纹素尺寸（`TilemapChunks.cpp`），即 **1 美术像素 = 1 world unit**，所以 640x360 就是画面的原生美术分辨率，Half 不损失任何美术细节，只是把相机栅格从 0.5 放宽到 1.0 world unit。换来的是整数倍输出：
+
+| 窗口 | Full 基准倍率 | Half 基准倍率 |
+| --- | ---: | ---: |
+| 1280x720 | 1.0x | 2x |
+| 1920x1080 | 1.5x | 3x |
+| 2560x1440 | 2.0x | 4x |
+
+实测（逐像素校验输出是否为严格的 NxN 块复制）：
+
+| 窗口 | 块大小 | 均匀块比例 |
+| --- | ---: | ---: |
+| 1280x720 | 2x2 | 2537/2537 = 100% |
+| 1920x1080 | 3x3 | 2714/2714 = 100% |
+| 2560x1440 全屏 | 4x4 | 2773/2773 = 100% |
+
+也就是说 Half 基准下这三档输出都是零重采样的整数放大，PixZoom 在整数倍时自动退化为 nearest。
+
+残差补偿（12.1）也已实现，所以固定缓冲模式下相机精度不再是 1 个场景像素，而是 1 个输出像素。注意它只解决**相机/背景**的抖动，角色自身的量化误差要靠 `native` 提高缓冲密度来解决（见 12.0）。
+
+### 12.1 残差补偿
+
+本工程的实现比原游戏的固定 2x 更通用：补偿量由当前输出倍率推出，而不是写死 2。
+
+```cpp
+// Camera.cpp, UpdateRenderCamera
+const float outputScale = outputRect.height / sceneSize.y;      // 可能是小数
+const float outputSteps = std::max(1.0f, std::round(outputScale));
+
+const Vector2 fine     = SnapToGrid(smoothTarget, ppwu * outputSteps);  // 一个输出像素
+const Vector2 unclamped = SnapToGrid(fine, ppwu);                       // 一个场景像素
+const Vector2 coarse   = SnapToGrid(ClampCameraToMap(unclamped, ...), ppwu);
+
+camera.renderTarget = coarse;                                   // 实际渲染用
+const Vector2 residual = coarse - fine;
+camera.renderShift = round(residual * ppwu * outputScale);       // 整数输出像素
+```
+
+`residual` 必然是 `1/(ppwu*outputSteps)` 的整数倍，所以 `renderShift` 在整数倍缩放下是精确整数，不引入任何重采样误差。最终 blit 把整幅画面平移这个量：
+
+```cpp
+// Rendering.cpp, DrawScaledRenderTarget
+const float guard = kSceneGuardPixels * outputScale;
+const Rectangle expanded = {
+    destination.x - guard + renderShift.x,
+    destination.y - guard + renderShift.y,
+    destination.width + guard * 2.0f,
+    destination.height + guard * 2.0f};
+
+BeginScissorMode(destination);          // 裁回场景矩形
+DrawTexturePro(texture, wholeBuffer, expanded, ...);
+EndScissorMode();
+```
+
+关键点：
+
+- **guard/overscan**：场景缓冲实际是 `642x362`（Full 下 `1282x722`），`kSceneGuardPixels = 1`。丢弃的残差不会超过半个场景像素，一圈 1 像素足够。相机 offset 取的是带 guard 的缓冲中心。
+- **裁剪用 scissor**，不用改 source 矩形。source 保持整像素、dest 平移整数输出像素，避免分数纹理坐标带来的重采样。
+- **地图边界要跳过补偿**：相机被 clamp 住时残差是 clamp 的产物，平移会把地图外的 guard 像素拉进画面。判据是 `coarse != unclamped`，此时 `renderShift` 归零 —— 边界处相机本来就不动，也没有抖动需要补。
+- **所有动态物体仍按 `coarse` 和 `ppwu` 量化**，整幅画面一起平移，所以玩家和背景之间不会产生相对抖动。
+
+实测（F7 单步，斜向行走，1280x720 窗口即 2x 输出，统计每 tick 背景位移的步长集合）：
+
+| 配置 | 步长集合（screen px） | 平均 |
+| --- | --- | ---: |
+| Full，无补偿 | {0, 2, 3, 4} | -2.37 |
+| Half，无补偿 | **{0, 2, 4}** | -2.37 |
+| Half + 残差补偿 | **{0, 2, 3, 4}** | -2.37 |
+
+Half 无补偿时步长只能是偶数（栅格 2 screen px），补偿后恢复出奇数步长，抖动幅度与 Full 一致；而 1080p/1440p 仍然是整数倍缩放。1920x1080 下逐像素校验美术像素仍为严格的 3x3 均匀块（1750/1750），平移只改变块的相位，不破坏像素完整性。
+
+### 12.2 原始 Half 模式参数
 
 Half 模式目标：
 
@@ -781,9 +913,12 @@ Half 模式中的动态物体要与 coarse camera 使用一致的 `1 step/world 
 
 ### `src/modules/Console/Register.cpp`
 
-- `resolution` 只调整窗口，不再修改场景 render target。
+- `resolution` 只调整窗口，不再修改场景 render target；支持预设编号、16:9 高度值和 `WxH` 三种写法，并在改完之后把窗口居中。
+- `scalemode [sharp|smooth|integer]` 切换最终放大方式。
+- `sceneres [native|full|half]` 切换场景缓冲密度，运行时生效。`native` 跟随窗口（默认，对应原游戏 `clear`），`full`/`half` 固定 1280x720 / 640x360。
+- `fullscreen [on|off]`（等同 Alt+Enter）使用 borderless 全屏；全屏期间禁止 `resolution`。注意 F11 已被截图占用，不要再绑定。
 - `camerascale` 如果保留为调试命令，需要同步重新计算逻辑视野或明确标注它会破坏标准像素模式。
-- 推荐增加只读诊断命令，显示 window、scene target、logical view、PPU、render mode。
+- `videoinfo` 只读诊断，显示 window、scene target、logical view、zoom、PPWU、scale mode 和实际输出矩形。
 
 ## 14. 推荐初始参数
 
@@ -851,6 +986,12 @@ quantizedRenderPosition
 | 2560x1440 | 2x nearest；也可对比 PixZoom |
 
 切换窗口尺寸前后，可见世界范围必须始终为 `640x360` world units。
+
+窗口必须真正可缩放，否则本节无法验证：
+
+- `InitWindow` 之前设置 `FLAG_WINDOW_RESIZABLE`，之后设置 `SetWindowMinSize`。
+- `BeginDrawing()` 之后先对窗口 `ClearBackground()`，再 `BeginTextureMode()`；否则 letterbox 区域会保留上一帧像素。
+- fit 矩形只在最终 blit 时计算，任何游戏逻辑都不读窗口尺寸。
 
 ### 15.3 场景用例
 
@@ -951,10 +1092,24 @@ quantizedRenderPosition
 
 ### 阶段 F：输出质量
 
-- 非整数倍率增加 PixZoom/sharp-bilinear。
-- 需要支持 `640x360` 窗口时再加入 Half 模式和残差补偿。
+- 窗口可缩放（`FLAG_WINDOW_RESIZABLE` + 最小尺寸），并支持 borderless 全屏（Alt+Enter）。
+- 非整数倍率使用 PixZoom/sharp-bilinear；fit 而非 cover；窗口自身每帧清屏。
+- Half 基准（640x360 场景缓冲）已实现并设为默认，`sceneres` 可运行时切回 Full。
+- 残差补偿已实现（见 12.1）：相机栅格细到 1 个输出像素，两种基准都受益。
+- loading overlay 拆成两部分：遮罩/揭示圆在场景缓冲内绘制，spinner 和文字在 blit 之后以窗口坐标绘制，避免尺寸随场景缓冲变化。
 
 完成标准：五种目标窗口分辨率下构图一致，无裁切、无整体模糊、无边缘露底。
+
+已验证结果（`videoinfo` 实测）：
+
+| 窗口 | 输出矩形 | 倍率 |
+| --- | --- | ---: |
+| 1280x720 | 1280x720 at 0,0 | 1.00x |
+| 1920x1080 | 1920x1080 at 0,0 | 1.50x |
+| 1500x1000 | 1500x844 at 0,78 | 1.17x |
+| 1920x1080（integer 模式） | 1280x720 at 320,180 | 1.00x |
+
+四种情况下 scene buffer 均为 `1280x720`，logical view 均为 `640x360` world units。
 
 ## 18. 最终建议
 

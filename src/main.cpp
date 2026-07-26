@@ -41,6 +41,10 @@ static ecs_entity_t CreatePlayer(flecs::world &world) {
       {"idle-S", "player/A_idle-S.webp"},
       {"idle-E", "player/A_idle-E.webp"},
       {"idle-W", "player/A_idle-W.webp"},
+      // {"walk-N", "player/A_walk-N-debug.webp", 0.09f},
+      // {"walk-S", "player/A_walk-S-debug.webp", 0.09f},
+      // {"walk-E", "player/A_walk-E-debug.webp", 0.09f},
+      // {"walk-W", "player/A_walk-W-debug.webp", 0.09f},
       {"walk-N", "player/A_walk-N.webp", 0.09f},
       {"walk-S", "player/A_walk-S.webp", 0.09f},
       {"walk-E", "player/A_walk-E.webp", 0.09f},
@@ -93,7 +97,11 @@ static void UpdateLoadingRevealCenter(flecs::world &world) {
 
 int main() {
 
+  // The scene buffer is a fixed size, so the window is free to be any size:
+  // only the final blit rectangle depends on it (see Rendering::PresentFrame).
+  SetConfigFlags(FLAG_WINDOW_RESIZABLE);
   InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "raylib game cpp");
+  SetWindowMinSize(BASE_WIDTH, BASE_HEIGHT);
   SetExitKey(KEY_NULL);
   SetTargetFPS(60);
 
@@ -128,13 +136,16 @@ int main() {
   const auto postPhysics = buildPipeline<Simulation::PostPhysics>(world);
   const auto fixedUpdate = buildPipeline<Simulation::FixedUpdate>(world);
 
-  // Scene render-target is fixed at 1280x720 regardless of window size.
-  // The logical view (visible world units) is derived from this: 1280/zoom x 720/zoom = 640x360.
-  auto &renderTargetSize = world.get_mut<Rendering::RenderTargetSize>();
-  renderTargetSize.dimension = Vector2{1280.0f, 720.0f};
-
+  // The visible world is fixed at 640x360 world units regardless of window size.
   auto &logicalView = world.get_mut<Rendering::LogicalViewSize>();
-  logicalView.value = Vector2{640.0f, 360.0f};
+  logicalView.value = Vector2{static_cast<float>(BASE_WIDTH), static_cast<float>(BASE_HEIGHT)};
+
+  // Native = the scene buffer follows the window at an integer zoom, which is
+  // what Eastward's default "clear" mode does. It is the only setting where the
+  // camera AND every character quantise to half an output pixel rather than
+  // half an art pixel, so neither the map nor the characters visibly step.
+  // 'sceneres full|half' pins a fixed buffer instead.
+  Rendering::SetSceneResolution(world, Rendering::SceneResolution::Native);
 
   float fixedTimeStep = 1.0f / 60.0f;
   float accumulator = 0.0f;
@@ -172,6 +183,12 @@ int main() {
 
     if (!consoleWasOpen && IsKeyPressed(KEY_ESCAPE)) {
       break;
+    }
+
+    // Alt+Enter, not F11: F11 is already the screenshot key (Debug::ScreenshotCapture).
+    const bool altHeld = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
+    if (!consoleIsOpen && altHeld && (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER))) {
+      ToggleBorderlessWindowed();
     }
 
     const auto frameTime = GetFrameTime();
@@ -219,19 +236,34 @@ int main() {
       }
     }
 
+    // Re-derive the scene buffer density if the window changed (Native only).
+    // Must run before the camera update so it quantises against the new grid.
+    Rendering::UpdateAutoSceneResolution(world);
+
     // --- Per-render-frame render preparation ---
-    // 1. Interpolate simulation positions.
-    const float renderAlpha = std::clamp(accumulator / fixedTimeStep, 0.0f, 1.0f);
+    // 1. Interpolate simulation positions. While paused there is no partial
+    //    tick to blend, so show the last completed tick (alpha = 1) instead of
+    //    snapping back to PreviousPosition.
+    const float renderAlpha = frameStepper.IsPaused()
+                                  ? 1.0f
+                                  : std::clamp(accumulator / fixedTimeStep, 0.0f, 1.0f);
     if (!loadingScreenVisible) {
       Rendering::InterpolatePositions(world, renderAlpha);
 
       // 2. Update the smooth camera using the interpolated player position.
       //    Must happen before QuantizeRenderPositions so camera.renderTarget is ready.
-      const auto playerEntity = world.lookup("Player");
-      if (playerEntity.is_valid()) {
-        const auto *rp = playerEntity.try_get<Rendering::RenderPosition>();
-        if (rp) {
-          GameCamera::UpdateRenderCamera(world, rp->interpolated, frameTime);
+      //    The camera is part of the simulation's visible state, so it only
+      //    advances when the simulation does; otherwise its exponential damping
+      //    would keep closing on the player while the world is frozen. A single
+      //    step advances it by exactly one fixed tick, not by real frame time.
+      if (frameStepper.ShouldAdvanceSimulation()) {
+        const float cameraDeltaTime = frameStepper.IsStepRequested() ? fixedTimeStep : frameTime;
+        const auto playerEntity = world.lookup("Player");
+        if (playerEntity.is_valid()) {
+          const auto *rp = playerEntity.try_get<Rendering::RenderPosition>();
+          if (rp) {
+            GameCamera::UpdateRenderCamera(world, rp->interpolated, cameraDeltaTime);
+          }
         }
       }
 
@@ -266,6 +298,7 @@ int main() {
 
   world.quit();
   GameConsole::Shutdown();
+  Rendering::Shutdown();
   CloseWindow();
 
   return 0;
