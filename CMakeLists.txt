@@ -31,12 +31,14 @@ target_link_libraries(rlimgui PUBLIC raylib imgui::imgui)
 add_executable(${PROJECT_NAME}
     src/main.cpp
     src/modules/Camera.cpp
+    src/modules/Core/Core.cpp
     src/modules/Console/Console.cpp
     src/modules/Console/ConsoleUI.cpp
     src/modules/Console/Register.cpp
     src/modules/Movement.cpp
     src/modules/Rendering.cpp
     src/modules/Physics.cpp
+    src/modules/Window.cpp
     src/modules/Stairs/Stairs.cpp
 
     src/modules/Map/Map.cpp

@@ -162,8 +162,10 @@ module::module(flecs::world &world) {
         Physics::CreateBoxSensor(entity, stair.bounds);
       });
 
+  // PostPhysicsEvents, not PostPhysics: these events are only meaningful once
+  // Physics' "Sync Physics Positions" has written the step results back.
   world.system("Process Stair Sensor Events")
-      .kind<Simulation::PostPhysics>()
+      .kind<Simulation::PostPhysicsEvents>()
       .run([](flecs::iter &it) {
         flecs::world world = it.world();
         for (const auto &event : Physics::SensorEvents(world)) {
@@ -175,9 +177,11 @@ module::module(flecs::world &world) {
         }
       });
 
-  world.system<const Rendering::Position, FloorState>("Update Stair Floor State")
-      .kind<Simulation::FixedUpdate>()
-      .each([](flecs::entity entity, const Rendering::Position &position, FloorState &state) {
+  // FixedUpdateLate, not FixedUpdate: the sampled position must be the final
+  // one for this tick, i.e. after Movement has clamped the player to the world.
+  world.system<const Core::Position, FloorState>("Update Stair Floor State")
+      .kind<Simulation::FixedUpdateLate>()
+      .each([](flecs::entity entity, const Core::Position &position, FloorState &state) {
         const Vector2 samplePoint = Vector2Add(position.value, state.sampleOffset);
 
         ResetToBase(state);

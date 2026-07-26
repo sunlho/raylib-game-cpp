@@ -120,7 +120,7 @@ void DrawScaledRenderTarget(const RenderTexture2D &renderTarget, const Vector2 &
   // side and translated by renderShift; the scissor crops it back to the scene
   // rectangle, so the shift can never expose the buffer edge.
   const float outputScale = destination.height / targetSize.y;
-  const float guard = kSceneGuardPixels * outputScale;
+  const float guard = Core::kSceneGuardPixels * outputScale;
   const Rectangle expanded = {
       destination.x - guard + renderShift.x,
       destination.y - guard + renderShift.y,
@@ -357,7 +357,7 @@ bool IsLoadingSequenceActive(const flecs::world &world) {
 
 void BeginFrame(flecs::world &world) {
   auto &renderTarget = world.get_mut<RenderTexture2D>();
-  const auto &renderTargetSize = world.get<RenderTargetSize>();
+  const auto &renderTargetSize = world.get<Core::RenderTargetSize>();
   auto &renderTargetState = world.get_mut<RenderTargetState>();
 
   BeginDrawing();
@@ -366,7 +366,7 @@ void BeginFrame(flecs::world &world) {
   ClearBackground(BLACK);
 
   // The texture is one guard pixel larger than the scene on every side.
-  renderTargetState.active = EnsureRenderTarget(renderTarget, SceneBufferSize(renderTargetSize.dimension));
+  renderTargetState.active = EnsureRenderTarget(renderTarget, Core::SceneBufferSize(renderTargetSize.dimension));
   if (renderTargetState.active) {
     BeginTextureMode(renderTarget);
     ClearBackground(BLACK);
@@ -375,11 +375,11 @@ void BeginFrame(flecs::world &world) {
 
 void PresentFrame(flecs::world &world) {
   const auto &renderTargetState = world.get<RenderTargetState>();
-  const auto &renderTargetSize = world.get<RenderTargetSize>();
+  const auto &renderTargetSize = world.get<Core::RenderTargetSize>();
 
   // Covers the guard border too, so the mask never leaves a bright fringe when
   // the blit is shifted.
-  DrawLoadingMask(world.get<LoadingScreen>(), SceneBufferSize(renderTargetSize.dimension));
+  DrawLoadingMask(world.get<LoadingScreen>(), Core::SceneBufferSize(renderTargetSize.dimension));
 
   if (renderTargetState.active) {
     EndTextureMode();
@@ -457,13 +457,25 @@ float NativeSceneScale(const Vector2 &logicalView) {
   return std::clamp(std::floor(fit), 1.0f, 8.0f);
 }
 
+// Output pixels per scene pixel for the current window and scene buffer.
+// Published as Core::OutputScale so the camera can quantise against the finest
+// grid the screen can show without knowing how the fit is computed.
+void RefreshOutputScale(flecs::world &world) {
+  const Vector2 sceneSize = world.get<Core::RenderTargetSize>().dimension;
+  const bool integerOnly = world.get<OutputSettings>().mode == OutputScaleMode::Integer;
+  const Rectangle rect = ComputeOutputRect(GetScreenWidth(), GetScreenHeight(), sceneSize, integerOnly);
+
+  world.get_mut<Core::OutputScale>().value =
+      (sceneSize.y > 0.0f && rect.height > 0.0f) ? rect.height / sceneSize.y : 1.0f;
+}
+
 void ApplySceneScale(flecs::world &world, float pixelsPerWorldUnit) {
   auto &settings = world.get_mut<SceneSettings>();
   settings.pixelsPerWorldUnit = pixelsPerWorldUnit;
 
   // The visible world is the invariant; the buffer is derived from it.
-  const Vector2 logicalView = world.get<LogicalViewSize>().value;
-  world.get_mut<RenderTargetSize>().dimension = Vector2Scale(logicalView, pixelsPerWorldUnit);
+  const Vector2 logicalView = world.get<Core::LogicalViewSize>().value;
+  world.get_mut<Core::RenderTargetSize>().dimension = Vector2Scale(logicalView, pixelsPerWorldUnit);
 
   auto &camera = world.get_mut<GameCamera::MainCamera>();
   camera.value.zoom = pixelsPerWorldUnit;
@@ -472,10 +484,13 @@ void ApplySceneScale(flecs::world &world, float pixelsPerWorldUnit) {
   // Re-snap onto the new grid so the first frame after a switch is aligned;
   // smoothTarget keeps full float precision and is deliberately untouched.
   camera.renderTarget = camera.snapToRenderGrid
-                            ? SnapToGrid(camera.smoothTarget, camera.pixelsPerWorldUnit)
+                            ? Core::SnapToGrid(camera.smoothTarget, camera.pixelsPerWorldUnit)
                             : camera.smoothTarget;
   camera.renderShift = {0.0f, 0.0f};
   camera.value.target = camera.renderTarget;
+
+  // The buffer just changed size, so the blit scale did too.
+  RefreshOutputScale(world);
 }
 
 float ResolutionScale(flecs::world &world, SceneResolution resolution) {
@@ -485,7 +500,9 @@ float ResolutionScale(flecs::world &world, SceneResolution resolution) {
   case SceneResolution::Full:
     return 2.0f;
   case SceneResolution::Native:
-    return NativeSceneScale(world.get<LogicalViewSize>().value);
+    return NativeSceneScale(world.get<Core::LogicalViewSize>().value);
+  case SceneResolution::Custom:
+    return world.get<SceneSettings>().pixelsPerWorldUnit;
   }
   return 1.0f;
 }
@@ -497,16 +514,31 @@ void SetSceneResolution(flecs::world &world, SceneResolution resolution) {
   ApplySceneScale(world, ResolutionScale(world, resolution));
 }
 
-void UpdateAutoSceneResolution(flecs::world &world) {
-  const auto &settings = world.get<SceneSettings>();
-  if (settings.resolution != SceneResolution::Native) {
+void SetSceneScale(flecs::world &world, float pixelsPerWorldUnit) {
+  if (!(pixelsPerWorldUnit > 0.0f)) {
     return;
   }
 
-  const float desired = NativeSceneScale(world.get<LogicalViewSize>().value);
-  if (desired != settings.pixelsPerWorldUnit) {
-    ApplySceneScale(world, desired);
+  world.get_mut<SceneSettings>().resolution = SceneResolution::Custom;
+  ApplySceneScale(world, pixelsPerWorldUnit);
+}
+
+void UpdateOutputGeometry(flecs::world &world) {
+  const auto &settings = world.get<SceneSettings>();
+  if (settings.resolution == SceneResolution::Native) {
+    const float desired = NativeSceneScale(world.get<Core::LogicalViewSize>().value);
+    if (desired != settings.pixelsPerWorldUnit) {
+      // ApplySceneScale refreshes the output scale itself.
+      ApplySceneScale(world, desired);
+      return;
+    }
   }
+
+  // The scene buffer can stay the same size while the blit scale changes: at
+  // 1280x720 and 1600x900 the native zoom is 2 either way, but one scene pixel
+  // covers 2.0 output pixels in the first case and 2.5 in the second. So this
+  // has to run every frame, not only when the buffer is resized.
+  RefreshOutputScale(world);
 }
 
 const char *ToString(SceneResolution resolution) {
@@ -517,6 +549,8 @@ const char *ToString(SceneResolution resolution) {
     return "full";
   case SceneResolution::Native:
     return "native";
+  case SceneResolution::Custom:
+    return "custom";
   }
   return "native";
 }
@@ -554,17 +588,10 @@ bool ParseOutputScaleMode(const std::string &text, OutputScaleMode &mode) {
 }
 
 module::module(flecs::world &world) {
-  Reflection::Register<Position>(world);
-  Reflection::Register<PreviousPosition>(world);
-  Reflection::Register<RenderPosition>(world);
+  // Position, RenderPosition and the view singletons belong to Core::module,
+  // which must already be imported.
   Reflection::Register<Rectangle>(world);
   Reflection::Register<RenderComponent>(world);
-  Reflection::Register<LogicalViewSize>(world)
-      .add(flecs::Singleton)
-      .set<LogicalViewSize>({});
-  Reflection::Register<RenderTargetSize>(world)
-      .add(flecs::Singleton)
-      .set<RenderTargetSize>({});
   Reflection::Register<RenderTargetState>(world)
       .add(flecs::Singleton)
       .set<RenderTargetState>({});
@@ -584,16 +611,16 @@ module::module(flecs::world &world) {
       .add(flecs::Singleton)
       .set<RenderTexture2D>({});
 
-  world.system<const Position, const RenderComponent>("Draw Renderables")
+  world.system<const Core::Position, const RenderComponent>("Draw Renderables")
       .kind<Phases::World>()
       .without<SortableTag>()
-      .each([](flecs::entity e, const Position &p, const RenderComponent &renderable) {
+      .each([](flecs::entity e, const Core::Position &p, const RenderComponent &renderable) {
         if (!renderable.visible || !renderable.object) {
           return;
         }
         // Use quantised render position when available; fall back to sim position.
-        const RenderPosition *rp = e.try_get<RenderPosition>();
-        const Position drawPos = rp ? Position{rp->quantized} : p;
+        const Core::RenderPosition *rp = e.try_get<Core::RenderPosition>();
+        const Core::Position drawPos = rp ? Core::Position{rp->quantized} : p;
         renderable.object->Draw(drawPos);
       });
 }
@@ -604,7 +631,7 @@ void PrepareRenderFrame(flecs::world &world, float alpha) {
 }
 
 void InterpolatePositions(flecs::world &world, float alpha) {
-  world.each([alpha](const Position &current, const PreviousPosition &previous, RenderPosition &rp) {
+  world.each([alpha](const Core::Position &current, const Core::PreviousPosition &previous, Core::RenderPosition &rp) {
     rp.interpolated = Vector2Lerp(previous.value, current.value, alpha);
   });
 }
@@ -614,8 +641,8 @@ void QuantizeRenderPositions(flecs::world &world) {
   const Vector2 renderCam = camera.renderTarget;
   const float ppwu = camera.pixelsPerWorldUnit;
 
-  world.each([renderCam, ppwu](RenderPosition &rp) {
-    rp.quantized = QuantizeForCamera(rp.interpolated, renderCam, ppwu);
+  world.each([renderCam, ppwu](Core::RenderPosition &rp) {
+    rp.quantized = Core::QuantizeForCamera(rp.interpolated, renderCam, ppwu);
   });
 }
 

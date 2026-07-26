@@ -3,23 +3,9 @@
 #include "flecs.h"
 #include "raylib.h"
 
+#include "Core/Core.h"
+
 namespace GameCamera {
-
-// Motion state that drives FocusProxy look-ahead distance.
-enum class FollowMotion {
-  Idle,
-  Walk,
-  Attack,
-  Run,
-};
-
-// First-layer focus proxy: smoothly tracks the desired look-ahead direction and
-// distance so the camera leads the player before they change direction.
-struct FocusProxy {
-  Vector2 direction = {0.0f, 1.0f}; // normalised facing; initialised facing south
-  Vector2 offset = {0.0f, 0.0f};    // direction * distance, applied to camera target
-  float distance = 0.0f;
-};
 
 struct MainCamera {
   Camera2D value = {
@@ -48,9 +34,6 @@ struct MainCamera {
   // whole image shifts together, no relative jitter is introduced.
   Vector2 renderShift = {0.0f, 0.0f};
 
-  // Look-ahead proxy  updated every render frame before camera smoothing.
-  FocusProxy focus{};
-
   // Exponential-damping speed (lambda).
   // 5.66 ydy Eastward's k=0.09 per 60 Hz reference frame converted to lambda.
   float followSpeed = 5.66f;
@@ -72,8 +55,8 @@ void End2D(const flecs::world &world);
 //   dt                     real frame delta time (NOT fixedTimeStep).
 void UpdateRenderCamera(flecs::world &world, Vector2 interpolatedPlayerPos, float dt);
 
-// Instantly reposition smoothTarget and renderTarget to focus, and reset the
-// FocusProxy. Call on teleport / map change / spawn to prevent long fly-overs.
+// Instantly reposition smoothTarget and renderTarget to focus. Call on
+// teleport / map change / spawn to prevent long fly-overs.
 void SnapCameraTo(flecs::world &world, Vector2 focus);
 
 struct module {

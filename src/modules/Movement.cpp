@@ -6,10 +6,9 @@
 #include "raylib.h"
 #include "raymath.h"
 
-#include "Camera.h"
 #include "Character/Character.h"
 #include "Console/Console.h"
-#include "Map/Map.h"
+#include "Core/Core.h"
 #include "Movement.h"
 #include "Physics.h"
 #include "Reflection.h"
@@ -21,15 +20,15 @@ namespace {
 
 constexpr float DiagonalMovementEpsilon = 1.0e-4f;
 
-float ClampAxisToBounds(float value, float halfExtent, float mapExtent) {
-  if (mapExtent <= 0.0f) {
+float ClampAxisToBounds(float value, float halfExtent, float worldExtent) {
+  if (worldExtent <= 0.0f) {
     return value;
   }
 
   const float minValue = halfExtent;
-  const float maxValue = mapExtent - halfExtent;
+  const float maxValue = worldExtent - halfExtent;
   if (maxValue < minValue) {
-    return mapExtent * 0.5f;
+    return worldExtent * 0.5f;
   }
 
   return std::clamp(value, minValue, maxValue);
@@ -98,16 +97,16 @@ module::module(flecs::world &world) {
         velocity.value = Vector2Scale(direction, speed.value * currentMultiplier);
       });
 
-  world.system<Rendering::Position, const Character::SpriteSet, const Character::AnimationController, Rendering::RenderComponent, const Physics::PhysicsBody>("Clamp Player To Map Bounds")
+  world.system<Core::Position, const Character::SpriteSet, const Character::AnimationController, Rendering::RenderComponent, const Physics::PhysicsBody>("Clamp Player To World Bounds")
       .kind<Simulation::FixedUpdate>()
       .with<PlayerControlled>()
-      .each([](flecs::iter &it, size_t, Rendering::Position &position, const Character::SpriteSet &spriteSet, const Character::AnimationController &controller, Rendering::RenderComponent &renderComponent, const Physics::PhysicsBody &physicsBody) {
-        const auto &mapBounds = it.world().get<MapManager::MapBounds>();
+      .each([](flecs::iter &it, size_t, Core::Position &position, const Character::SpriteSet &spriteSet, const Character::AnimationController &controller, Rendering::RenderComponent &renderComponent, const Physics::PhysicsBody &physicsBody) {
+        const auto &worldBounds = it.world().get<Core::WorldBounds>();
         const Vector2 halfExtents = Character::GetSpriteHalfExtents(spriteSet, controller);
 
         const Vector2 clampedPosition = {
-            ClampAxisToBounds(position.value.x, halfExtents.x, mapBounds.dimension.x),
-            ClampAxisToBounds(position.value.y, halfExtents.y, mapBounds.dimension.y)};
+            ClampAxisToBounds(position.value.x, halfExtents.x, worldBounds.dimension.x),
+            ClampAxisToBounds(position.value.y, halfExtents.y, worldBounds.dimension.y)};
 
         if (clampedPosition.x != position.value.x || clampedPosition.y != position.value.y) {
           Physics::Relocate(physicsBody, clampedPosition);
@@ -118,9 +117,8 @@ module::module(flecs::world &world) {
         renderComponent.sortY = position.value.y + halfExtents.y;
       });
 
-  // Camera follow is now handled per render frame in main.cpp via
+  // Camera follow is handled per render frame in main.cpp via
   // GameCamera::UpdateRenderCamera(), not inside the fixed simulation loop.
-  // The CameraFollow phase is kept for API compatibility but has no systems.
 }
 
 } // namespace Movement

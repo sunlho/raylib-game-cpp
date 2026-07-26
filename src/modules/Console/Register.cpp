@@ -11,6 +11,7 @@
 #include "../Movement.h"
 #include "../Physics.h"
 #include "../Rendering.h"
+#include "../Window.h"
 
 #include "Console.h"
 #include "ConsoleInternal.h"
@@ -23,72 +24,6 @@ bool ParseFloat(const std::string &text, float &value) {
   char *end = nullptr;
   value = std::strtof(text.c_str(), &end);
   return end != text.c_str() && *end == '\0' && std::isfinite(value);
-}
-
-// Accepts a preset index (1-4), a bare 16:9 height like "1080" (Eastward's
-// window_size setting works this way), or an explicit "1920x1080".
-bool ParseWindowSize(const std::string &text, int &width, int &height) {
-  const auto separator = text.find_first_of("xX*");
-  if (separator != std::string::npos) {
-    const long parsedWidth = std::strtol(text.substr(0, separator).c_str(), nullptr, 10);
-    const long parsedHeight = std::strtol(text.substr(separator + 1).c_str(), nullptr, 10);
-    if (parsedWidth < 320 || parsedHeight < 180 || parsedWidth > 16384 || parsedHeight > 16384) {
-      return false;
-    }
-    width = static_cast<int>(parsedWidth);
-    height = static_cast<int>(parsedHeight);
-    return true;
-  }
-
-  char *end = nullptr;
-  const long value = std::strtol(text.c_str(), &end, 10);
-  if (end == text.c_str() || *end != '\0') {
-    return false;
-  }
-
-  switch (value) {
-  case 1:
-    width = 1280;
-    height = 720;
-    return true;
-  case 2:
-    width = 1600;
-    height = 900;
-    return true;
-  case 3:
-    width = 1920;
-    height = 1080;
-    return true;
-  case 4:
-    width = 2560;
-    height = 1440;
-    return true;
-  default:
-    break;
-  }
-
-  if (value < 180 || value > 16384) {
-    return false;
-  }
-  height = static_cast<int>(value);
-  width = static_cast<int>(std::round(static_cast<double>(height) * 16.0 / 9.0));
-  return true;
-}
-
-// SetWindowSize keeps the top-left corner, which can push a larger window off
-// screen. Re-centre it on the current monitor instead.
-void CenterWindow() {
-  const int monitor = GetCurrentMonitor();
-  const int monitorWidth = GetMonitorWidth(monitor);
-  const int monitorHeight = GetMonitorHeight(monitor);
-  if (monitorWidth <= 0 || monitorHeight <= 0) {
-    return;
-  }
-
-  const Vector2 monitorPosition = GetMonitorPosition(monitor);
-  SetWindowPosition(
-      static_cast<int>(monitorPosition.x) + (monitorWidth - GetScreenWidth()) / 2,
-      static_cast<int>(monitorPosition.y) + (monitorHeight - GetScreenHeight()) / 2);
 }
 
 std::string JoinArguments(const std::vector<std::string> &arguments) {
@@ -104,12 +39,12 @@ std::string JoinArguments(const std::vector<std::string> &arguments) {
 
 void TeleportPlayer(flecs::world &world, float x, float y) {
   const auto player = world.lookup("Player");
-  if (!player.is_valid() || !player.has<Rendering::Position>()) {
+  if (!player.is_valid() || !player.has<Core::Position>()) {
     return;
   }
 
   const Vector2 destination{x, y};
-  player.get_mut<Rendering::Position>().value = destination;
+  player.get_mut<Core::Position>().value = destination;
   if (player.has<Movement::Velocity>()) {
     player.get_mut<Movement::Velocity>().value = Vector2{0.0f, 0.0f};
   }
@@ -197,35 +132,39 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
       world,
       {
           "resolution",
-          "[preset|height|WxH]",
-          "Show or set window size (1: 1280x720, 2: 1600x900, 3: 1920x1080, 4: 2560x1440, or 1080 / 1920x1080)",
+          "[preset|fullscreen]",
+          "Show or set window size (" + GameWindow::PresetList() + ", fullscreen)",
           [](flecs::world &, const std::vector<std::string> &arguments) {
-            static constexpr const char *kUsage =
-                "Usage: resolution [<1-4> | <height> | <width>x<height>]";
+            const std::string usage =
+                "Usage: resolution [<1-" + std::to_string(GameWindow::kPresetCount) +
+                "> | <height> | <width>x<height> | fullscreen]\n  " + GameWindow::PresetList() +
+                "\n  A preset that is not smaller than the monitor switches to fullscreen.";
             if (arguments.empty()) {
-              return CommandResult{
-                  true,
-                  "Window size: " + std::to_string(GetScreenWidth()) + "x" + std::to_string(GetScreenHeight())};
+              return CommandResult{true, "Window size: " + GameWindow::DescribeCurrent() + "\n" + usage};
             }
             if (arguments.size() != 1) {
-              return CommandResult{false, kUsage};
+              return CommandResult{false, usage};
             }
 
-            int width = 0;
-            int height = 0;
-            if (!ParseWindowSize(arguments.front(), width, height)) {
-              return CommandResult{false, kUsage};
+            const std::string &argument = arguments.front();
+            if (argument == "fullscreen" || argument == "full") {
+              GameWindow::SetFullscreen(true);
+              return CommandResult{true, "Window size: " + GameWindow::DescribeCurrent()};
             }
 
-            if (IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE)) {
-              return CommandResult{false, "Leave fullscreen first (F11 or 'fullscreen off')"};
+            int preset = 0;
+            if (!GameWindow::ParsePreset(argument, preset)) {
+              return CommandResult{false, "Unsupported window size.\n" + usage};
             }
 
-            SetWindowSize(width, height);
-            CenterWindow();
-            return CommandResult{
-                true,
-                "Window size set to " + std::to_string(width) + "x" + std::to_string(height)};
+            const bool wentFullscreen = GameWindow::ApplyPreset(preset);
+            if (wentFullscreen) {
+              return CommandResult{
+                  true,
+                  "Preset does not fit the monitor, switched to fullscreen (" +
+                      GameWindow::DescribeCurrent() + ")"};
+            }
+            return CommandResult{true, "Window size set to " + GameWindow::DescribeCurrent()};
           },
       });
 
@@ -267,7 +206,7 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
           [](flecs::world &commandWorld, const std::vector<std::string> &arguments) {
             static constexpr const char *kUsage = "Usage: sceneres [native|full|half]";
             const auto describe = [](flecs::world &w) {
-              const auto &size = w.get<Rendering::RenderTargetSize>().dimension;
+              const auto &size = w.get<Core::RenderTargetSize>().dimension;
               const auto &camera = w.get<GameCamera::MainCamera>();
               std::ostringstream text;
               text << std::fixed << std::setprecision(0);
@@ -308,9 +247,9 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
           "[on|off]",
           "Show or toggle borderless fullscreen (same as Alt+Enter)",
           [](flecs::world &, const std::vector<std::string> &arguments) {
-            const bool active = IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE);
+            const bool active = GameWindow::IsFullscreen();
             if (arguments.empty()) {
-              ToggleBorderlessWindowed();
+              GameWindow::ToggleFullscreen();
               return CommandResult{true, active ? "Fullscreen off" : "Fullscreen on"};
             }
             if (arguments.size() != 1) {
@@ -327,9 +266,7 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
               return CommandResult{false, "Usage: fullscreen [on|off]"};
             }
 
-            if (wanted != active) {
-              ToggleBorderlessWindowed();
-            }
+            GameWindow::SetFullscreen(wanted);
             return CommandResult{true, wanted ? "Fullscreen on" : "Fullscreen off"};
           },
       });
@@ -341,8 +278,8 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
           "",
           "Show window, scene buffer, logical view and output scaling",
           [](flecs::world &commandWorld, const std::vector<std::string> &) {
-            const auto &sceneSize = commandWorld.get<Rendering::RenderTargetSize>().dimension;
-            const auto &logicalView = commandWorld.get<Rendering::LogicalViewSize>().value;
+            const auto &sceneSize = commandWorld.get<Core::RenderTargetSize>().dimension;
+            const auto &logicalView = commandWorld.get<Core::LogicalViewSize>().value;
             const auto &mainCamera = commandWorld.get<GameCamera::MainCamera>();
             const auto mode = Rendering::GetOutputScaleMode(commandWorld);
             const Rectangle output = Rendering::ComputeOutputRect(
@@ -354,7 +291,7 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
             std::ostringstream report;
             report << std::fixed << std::setprecision(2);
             report << "Window:       " << GetScreenWidth() << "x" << GetScreenHeight()
-                   << (IsWindowState(FLAG_BORDERLESS_WINDOWED_MODE) ? " (fullscreen)" : "")
+                   << (GameWindow::IsFullscreen() ? " (fullscreen)" : "")
                    << "\nScene buffer: " << sceneSize.x << "x" << sceneSize.y
                    << " (" << Rendering::ToString(Rendering::GetSceneResolution(commandWorld)) << ")"
                    << "\nLogical view: " << logicalView.x << "x" << logicalView.y << " world units"
@@ -382,16 +319,21 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
           "[0.1-10]",
           "Show or set camera scale",
           [](flecs::world &commandWorld, const std::vector<std::string> &arguments) {
-            auto &mainCamera = commandWorld.get_mut<GameCamera::MainCamera>();
             if (arguments.empty()) {
+              const auto &mainCamera = commandWorld.get<GameCamera::MainCamera>();
               return CommandResult{true, "Camera scale: " + std::to_string(mainCamera.value.zoom)};
             }
             float scale = 0.0f;
             if (!ParseFloat(arguments.front(), scale) || scale < 0.1f || scale > 10.0f) {
               return CommandResult{false, "Usage: cameraScale [0.1-10]"};
             }
-            mainCamera.value.zoom = scale;
-            return CommandResult{true, "Camera scale set to " + std::to_string(scale)};
+            // Never assign Camera2D::zoom here: it would leave pixelsPerWorldUnit
+            // and RenderTargetSize stale, and in Native mode the mismatch is
+            // undetectable by UpdateOutputGeometry, so it never recovers.
+            Rendering::SetSceneScale(commandWorld, scale);
+            return CommandResult{
+                true,
+                "Camera scale set to " + std::to_string(scale) + " (sceneres: custom)"};
           },
       });
 
@@ -426,10 +368,10 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
           "Show the player world position",
           [](flecs::world &commandWorld, const std::vector<std::string> &) {
             const auto player = commandWorld.lookup("Player");
-            if (!player.is_valid() || !player.has<Rendering::Position>()) {
+            if (!player.is_valid() || !player.has<Core::Position>()) {
               return CommandResult{false, "Player is unavailable"};
             }
-            const Vector2 position = player.get<Rendering::Position>().value;
+            const Vector2 position = player.get<Core::Position>().value;
             std::ostringstream output;
             output << std::fixed << std::setprecision(1) << "Player position: " << position.x << ", " << position.y;
             return CommandResult{true, output.str()};
@@ -455,7 +397,7 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
             }
 
             const auto player = commandWorld.lookup("Player");
-            if (!player.is_valid() || !player.has<Rendering::Position>()) {
+            if (!player.is_valid() || !player.has<Core::Position>()) {
               return CommandResult{false, "Player is unavailable"};
             }
 

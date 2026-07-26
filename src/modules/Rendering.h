@@ -10,6 +10,8 @@
 #include "raylib.h"
 #include "raymath.h"
 
+#include "Core/Core.h"
+
 namespace Rendering {
 
 struct Phases {
@@ -18,35 +20,9 @@ struct Phases {
   struct SortedWorld {};
 };
 
-// Simulation truth  written by physics, read by AI/collision. Never modify
-// inside a render-prep pass.
-struct Position {
-  Vector2 value;
-};
-
-// Simulation position captured at the START of each fixed tick, before physics.
-// Used as the "from" sample for render interpolation.
-struct PreviousPosition {
-  Vector2 value = {0.0f, 0.0f};
-};
-
-// Per-render-frame derived positions. Never written back to physics.
-//   interpolated  lerp(previous, current, alpha); continuous float.
-//   quantized     camera-relative snapped value; the only position used in Draw().
-struct RenderPosition {
-  Vector2 interpolated = {0.0f, 0.0f};
-  Vector2 quantized = {0.0f, 0.0f};
-};
-
-// Fixed logical view size in world units. Decoupled from window size.
-// The "resolution" console command must NOT modify this.
-struct LogicalViewSize {
-  Vector2 value = {640.0f, 360.0f};
-};
-
 struct Renderable {
   virtual ~Renderable() = default;
-  virtual void Draw(const Position &position) const = 0;
+  virtual void Draw(const Core::Position &position) const = 0;
 };
 
 struct RenderComponent {
@@ -57,28 +33,6 @@ struct RenderComponent {
 };
 
 struct SortableTag {};
-
-// Scene render-target size, EXCLUDING the guard border. Derived from
-// LogicalViewSize * camera zoom, and fixed for a given SceneResolution
-// regardless of window size. Window size only affects the final blit rectangle.
-struct RenderTargetSize {
-  Vector2 dimension;
-};
-
-// Overscan on every side of the scene buffer, in scene pixels. The camera can
-// only be positioned on whole scene pixels, so the sub-scene-pixel remainder is
-// recovered by translating the final blit by whole output pixels
-// (MainCamera::renderShift). That translation would expose the buffer edge, so
-// the buffer is rendered one pixel larger on each side and cropped on blit.
-// One pixel is enough: the discarded remainder never exceeds half a scene pixel.
-inline constexpr float kSceneGuardPixels = 1.0f;
-
-// Actual texture size of the scene buffer: scene size plus the guard border.
-inline Vector2 SceneBufferSize(Vector2 sceneTargetSize) {
-  return {
-      sceneTargetSize.x + kSceneGuardPixels * 2.0f,
-      sceneTargetSize.y + kSceneGuardPixels * 2.0f};
-}
 
 // Pixel density of the scene buffer, mirroring Eastward's visual_quality
 // (full / half) switch. The visible world stays LogicalViewSize either way;
@@ -98,6 +52,9 @@ enum class SceneResolution {
   // setting where BOTH the camera and every character quantise to half an
   // OUTPUT pixel instead of half an art pixel.
   Native,
+  // An explicit density set through SetSceneScale ("camerascale"). Excluded
+  // from the Native auto-resize path so the requested value actually sticks.
+  Custom,
 };
 
 struct SceneSettings {
@@ -149,28 +106,6 @@ struct LoadingStep {
   float minimumDisplayTime = 0.0f;
 };
 
-//  Math helpers
-
-// Snap value to the nearest multiple of (1/stepsPerWorldUnit).
-// stepsPerWorldUnit=2    0.5 world-unit grid (one scene pixel at zoom 2).
-inline float SnapToGrid(float value, float stepsPerWorldUnit) {
-  if (stepsPerWorldUnit <= 0.0f)
-    return value;
-  return std::round(value * stepsPerWorldUnit) / stepsPerWorldUnit;
-}
-
-inline Vector2 SnapToGrid(Vector2 v, float stepsPerWorldUnit) {
-  return {SnapToGrid(v.x, stepsPerWorldUnit), SnapToGrid(v.y, stepsPerWorldUnit)};
-}
-
-// Camera-relative quantization: all dynamic objects share the same renderCamera
-// and pixelsPerWorldUnit so their relative pixel distances stay stable.
-inline Vector2 QuantizeForCamera(Vector2 worldPos, Vector2 renderCamera, float pixelsPerWorldUnit) {
-  Vector2 rel = Vector2Subtract(worldPos, renderCamera);
-  rel = SnapToGrid(rel, pixelsPerWorldUnit);
-  return Vector2Add(renderCamera, rel);
-}
-
 //  Free functions
 
 bool RunLoadingSequence(flecs::world &world, std::vector<LoadingStep> steps, std::string initialHint = {});
@@ -207,10 +142,18 @@ bool ParseOutputScaleMode(const std::string &text, OutputScaleMode &mode);
 // target is recreated on the next frame.
 void SetSceneResolution(flecs::world &world, SceneResolution resolution);
 
-// Re-derives the buffer density for SceneResolution::Native after a window
-// resize. No-op for the fixed Full/Half settings. Call once per frame before
-// the render-prep pass so the camera quantises against the right grid.
-void UpdateAutoSceneResolution(flecs::world &world);
+// Set an explicit scene buffer density and switch SceneResolution to Custom so
+// UpdateOutputGeometry stops re-deriving it from the window size.
+// Always go through this instead of assigning Camera2D::zoom directly: zoom,
+// pixelsPerWorldUnit and RenderTargetSize must move together or the
+// quantisation grid silently desynchronises from what is actually rendered.
+void SetSceneScale(flecs::world &world, float pixelsPerWorldUnit);
+
+// Refreshes everything derived from the current window size: the buffer density
+// for SceneResolution::Native (no-op for the fixed Full/Half settings) and
+// Core::OutputScale. Call once per frame before the render-prep pass so the
+// camera quantises against the grid the window can actually show.
+void UpdateOutputGeometry(flecs::world &world);
 
 inline SceneResolution GetSceneResolution(const flecs::world &world) {
   return world.get<SceneSettings>().resolution;

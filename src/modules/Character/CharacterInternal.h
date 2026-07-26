@@ -18,7 +18,7 @@ float RandomDelaySeconds(float minDelay, float maxDelay);
 class CharacterRenderable final : public Rendering::Renderable {
 public:
   CharacterRenderable(flecs::entity entity);
-  void Draw(const Rendering::Position &position) const override;
+  void Draw(const Core::Position &position) const override;
 
 private:
   flecs::entity entity_;

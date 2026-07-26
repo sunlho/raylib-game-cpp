@@ -35,9 +35,9 @@ void DestroyCurrentMap(MapState &mapState) {
 }
 
 void ClearMapData(flecs::world &world) {
-  auto &mapBounds = world.get_mut<MapBounds>();
-  mapBounds.dimension = Vector2{0.0f, 0.0f};
-  world.modified<MapBounds>();
+  auto &worldBounds = world.get_mut<Core::WorldBounds>();
+  worldBounds.dimension = Vector2{0.0f, 0.0f};
+  world.modified<Core::WorldBounds>();
 
   auto &activeData = world.get_mut<ActiveMapData>();
   activeData.textureBank.reset();
@@ -153,20 +153,22 @@ std::size_t CountTiles(const Tilemap::LoadedMap &loadedMap) {
   return count;
 }
 
-void LoadMapFromPath(flecs::world world, const MapPath &mapPath) {
+} // namespace
+
+void LoadMapFromPath(flecs::world &world, const std::string &path) {
   auto &mapState = world.get_mut<MapState>();
-  if (mapState.currentPath == mapPath.value && mapState.mapRoot.is_valid()) {
+  if (mapState.currentPath == path && mapState.mapRoot.is_valid()) {
     return;
   }
 
   auto &cacheState = world.get_mut<MapCacheState>();
   const std::size_t hitCountBefore = cacheState.hitCount;
   const auto sourceStart = Clock::now();
-  auto *loadedMap = GetOrLoadMap(cacheState, mapPath.value);
+  auto *loadedMap = GetOrLoadMap(cacheState, path);
   const auto sourceEnd = Clock::now();
   const double sourceMilliseconds = ElapsedMilliseconds(sourceStart, sourceEnd);
   if (!loadedMap) {
-    TraceLog(LOG_WARNING, "Map switch failed for '%s' during source/cache acquisition after %.3f ms", mapPath.value.c_str(), sourceMilliseconds);
+    TraceLog(LOG_WARNING, "Map switch failed for '%s' during source/cache acquisition after %.3f ms", path.c_str(), sourceMilliseconds);
     return;
   }
   const bool cacheHit = cacheState.hitCount > hitCountBefore;
@@ -180,13 +182,13 @@ void LoadMapFromPath(flecs::world world, const MapPath &mapPath) {
   ClearMapData(world);
 
   mapState.mapRoot = world.entity("MapRoot");
-  mapState.currentPath = mapPath.value;
+  mapState.currentPath = path;
 
   SpawnStairs(world, *loadedMap, mapState.mapRoot);
 
-  auto &mapBounds = world.get_mut<MapBounds>();
-  mapBounds.dimension = loadedMap->dimensions;
-  world.modified<MapBounds>();
+  auto &worldBounds = world.get_mut<Core::WorldBounds>();
+  worldBounds.dimension = loadedMap->dimensions;
+  world.modified<Core::WorldBounds>();
 
   auto &activeData = world.get_mut<ActiveMapData>();
   activeData.textureBank = loadedMap->textureBank;
@@ -206,7 +208,7 @@ void LoadMapFromPath(flecs::world world, const MapPath &mapPath) {
   TraceLog(
       preloadStats.failed == 0 ? LOG_INFO : LOG_WARNING,
       "Map switch '%s': source/cache=%.3f ms (%s), texture preload=%.3f ms (%llu requested, %llu ready, %llu failed), world materialization=%.3f ms (%llu chunks, %llu tiles, %llu stairs)",
-      mapPath.value.c_str(),
+      path.c_str(),
       sourceMilliseconds,
       cacheHit ? "cache hit" : "source load",
       preloadMilliseconds,
@@ -217,17 +219,6 @@ void LoadMapFromPath(flecs::world world, const MapPath &mapPath) {
       chunkCount,
       tileCount,
       stairCount);
-}
-
-} // namespace
-
-void RegisterMapLoader(flecs::world &world) {
-  world.observer<const MapPath>("Load Map Observer")
-      .event(flecs::OnSet)
-      .each([](flecs::entity entity, const MapPath &mapPath) {
-        auto world = entity.world();
-        LoadMapFromPath(world, mapPath);
-      });
 }
 
 } // namespace MapManager::Internal

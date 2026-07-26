@@ -171,8 +171,11 @@ void Internal::RegisterCharacterSprites(flecs::world &world) {
         }
       });
 
-  world.system<SpriteSet>("Unload Character Sprites")
-      .kind(flecs::OnRemove)
+  // Must be an observer, not a system: system::kind() sets a pipeline phase, and
+  // flecs::OnRemove is an event, not a phase. As a system this never ran and the
+  // GPU textures leaked whenever a character entity was destroyed.
+  world.observer<SpriteSet>("Unload Character Sprites")
+      .event(flecs::OnRemove)
       .each([](SpriteSet &spriteSet) {
         for (auto &entry : spriteSet.entries) {
           if (entry.animation.texture.id != 0) {

@@ -22,7 +22,10 @@ TileRenderable::TileRenderable(std::shared_ptr<const Tilemap::TilemapTextureBank
   destRect = tile.destRect;
 }
 
-void TileRenderable::Draw(const Rendering::Position &position) const {
+// destRect is stored in world space, so there is nothing to offset by; the
+// parameter only exists because Renderable::Draw is shared with entity-backed
+// renderables such as CharacterRenderable.
+void TileRenderable::Draw(const Core::Position &) const {
   const auto tileObject = textureBank->getTile(tileGid);
   if (!tileObject || tileObject->texturePath.empty()) {
     return;
@@ -45,7 +48,9 @@ void TileRenderable::Draw(const Rendering::Position &position) const {
 namespace {
 
 struct RenderableSortData {
-  Rendering::Position position;
+  // Only meaningful for entity-backed renderables; chunk tiles draw from their
+  // own world-space destRect and leave this zeroed.
+  Core::Position position;
   const Rendering::RenderComponent *renderComponent;
 };
 
@@ -117,7 +122,7 @@ void RegisterMapRendering(flecs::world &world) {
         }
       });
 
-  world.system<const Rendering::Position, const Rendering::RenderComponent>("Draw Sort Chunks")
+  world.system<const Core::Position, const Rendering::RenderComponent>("Draw Sort Chunks")
       .with<const Rendering::SortableTag>()
       .kind<Rendering::Phases::SortedWorld>()
       .run([sortScratch = std::move(sortScratch)](flecs::iter &it) {
@@ -127,17 +132,17 @@ void RegisterMapRendering(flecs::world &world) {
         sortData.clear();
 
         while (it.next()) {
-          auto position = it.field<const Rendering::Position>(0);
+          auto position = it.field<const Core::Position>(0);
           auto renderComponent = it.field<const Rendering::RenderComponent>(1);
 
           for (auto i : it) {
             // For dynamic entities, use the camera-relative quantised render
             // position (set by Rendering::PrepareRenderFrame) so they share the
             // same pixel grid as every other dynamic object.
-            const Rendering::RenderPosition *rp = it.entity(i).try_get<Rendering::RenderPosition>();
-            const Rendering::Position drawPos = rp
-                                                    ? Rendering::Position{rp->quantized}
-                                                    : position[i];
+            const Core::RenderPosition *rp = it.entity(i).try_get<Core::RenderPosition>();
+            const Core::Position drawPos = rp
+                                               ? Core::Position{rp->quantized}
+                                               : position[i];
             sortData.push_back(RenderableSortData{drawPos, &renderComponent[i]});
           }
         }
@@ -164,10 +169,7 @@ void RegisterMapRendering(flecs::world &world) {
         if (hasSortableChunks) {
           for (int dx = -1; dx <= 1; ++dx) {
             for (int dy = -1; dy <= 1; ++dy) {
-              int chunkX = center.x + dx;
-              int chunkY = center.y + dy;
-
-              ChunkKey key{chunkX, chunkY};
+              ChunkKey key{center.x + dx, center.y + dy};
               auto keyIt = activeData.sortableTiles.find(key);
               if (keyIt == activeData.sortableTiles.end()) {
                 continue;
@@ -178,16 +180,18 @@ void RegisterMapRendering(flecs::world &world) {
                   continue;
                 }
 
-                Rendering::Position position;
-                position.value.x = static_cast<float>(chunkX * activeData.chunkPixelWidth);
-                position.value.y = static_cast<float>(chunkY * activeData.chunkPixelHeight);
-                sortData.push_back(RenderableSortData{position, &renderComponent});
+                // Zero position: these are TileRenderables, which draw from
+                // their own world-space destRect and ignore the argument.
+                sortData.push_back(RenderableSortData{Core::Position{}, &renderComponent});
               }
             }
           }
         }
 
-        std::sort(sortData.begin(), sortData.end(), [](const RenderableSortData &a, const RenderableSortData &b) {
+        // stable_sort, not sort: entries that tie on both floor and sortY must
+        // keep their insertion order, otherwise overlapping tiles swap depth
+        // between frames and visibly flicker.
+        std::stable_sort(sortData.begin(), sortData.end(), [](const RenderableSortData &a, const RenderableSortData &b) {
           if (a.renderComponent->floor != b.renderComponent->floor) {
             return a.renderComponent->floor < b.renderComponent->floor;
           }

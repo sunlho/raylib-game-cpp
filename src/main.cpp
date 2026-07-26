@@ -9,6 +9,7 @@
 #include "modules/Character/Character.h"
 #include "modules/Console/Console.h"
 #include "modules/Console/Register.h"
+#include "modules/Core/Core.h"
 #include "modules/Debug/DebugDraw.h"
 #include "modules/Debug/FrameStepper.h"
 #include "modules/Debug/Screenshot.h"
@@ -20,15 +21,12 @@
 #include "modules/Simulation.h"
 #include "modules/Stairs/Stairs.h"
 #include "modules/Utils.h"
+#include "modules/Window.h"
 
-// constexpr int SCREEN_WIDTH = 2560;
-// constexpr int SCREEN_HEIGHT = 1440;
-// constexpr int SCREEN_WIDTH = 1920;
-// constexpr int SCREEN_HEIGHT = 1080;
-// constexpr int SCREEN_WIDTH = 1600;
-// constexpr int SCREEN_HEIGHT = 900;
-constexpr int SCREEN_WIDTH = 1280;
-constexpr int SCREEN_HEIGHT = 720;
+// Startup window size, picked from GameWindow::kPresets (0: 1280x720,
+// 1: 1600x900, 2: 1920x1080, 3: 2560x1440). The window is not resizable; a
+// preset that is not smaller than the monitor starts in fullscreen instead.
+constexpr int STARTUP_PRESET = GameWindow::kDefaultPreset;
 constexpr int BASE_WIDTH = 640;
 constexpr int BASE_HEIGHT = 360;
 
@@ -66,9 +64,9 @@ static ecs_entity_t CreatePlayer(flecs::world &world) {
       .set<Character::AnimationController>({})
       .set<Character::IdleBehavior>({})
       .set<Character::SpriteSet>(std::move(playerSprites))
-      .set<Rendering::Position>({playerStart})
-      .set<Rendering::PreviousPosition>({playerStart})
-      .set<Rendering::RenderPosition>({playerStart, playerStart})
+      .set<Core::Position>({playerStart})
+      .set<Core::PreviousPosition>({playerStart})
+      .set<Core::RenderPosition>({playerStart, playerStart})
       .set<Stairs::FloorState>({2.5f, 2.5f})
       .set<Movement::Velocity>({Vector2{0.0f, 0.0f}})
       .set<Movement::MoveSpeed>({100.0f})
@@ -82,34 +80,33 @@ static ecs_entity_t CreatePlayer(flecs::world &world) {
 
 static void UpdateLoadingRevealCenter(flecs::world &world) {
   const auto player = world.lookup("Player");
-  if (!player.is_valid() || !player.has<Rendering::Position>()) {
+  if (!player.is_valid() || !player.has<Core::Position>()) {
     return;
   }
 
   // Use quantised render position for the reveal centre when available so the
   // circle follows the pixel-aligned player position.
-  const auto *rp = player.try_get<Rendering::RenderPosition>();
-  const auto &pos = player.get<Rendering::Position>();
+  const auto *rp = player.try_get<Core::RenderPosition>();
+  const auto &pos = player.get<Core::Position>();
   const Vector2 worldPos = rp ? rp->quantized : pos.value;
   const auto &mainCamera = world.get<GameCamera::MainCamera>();
   Rendering::SetLoadingRevealCenter(world, GetWorldToScreen2D(worldPos, mainCamera.value));
 }
 
-int main() {
-
-  // The scene buffer is a fixed size, so the window is free to be any size:
-  // only the final blit rectangle depends on it (see Rendering::PresentFrame).
-  SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-  InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "raylib game cpp");
-  SetWindowMinSize(BASE_WIDTH, BASE_HEIGHT);
-  SetExitKey(KEY_NULL);
-  SetTargetFPS(60);
-
+// Owns the flecs world for exactly one game session. Scoped as its own function
+// so the world is destroyed before main() tears the window down: map texture
+// banks and character sprite sets release their GPU textures from component
+// destructors, which need a live GL context.
+static void RunGame() {
   flecs::world world;
   world.set<flecs::Rest>({});
   world.import<flecs::stats>();
   ecs_entity_t dequeue_rest = ecs_lookup(world, "flecs.rest.DequeueRest");
 
+  // Core first: every other module builds on its components and singletons.
+  // Beyond that the import order no longer matters -- cross-module execution
+  // order is pinned by the Simulation phases, not by registration order.
+  world.import<Core::module>();
   world.import<Rendering::module>();
   world.import<GameConsole::module>();
   world.import<GameCamera::module>();
@@ -126,18 +123,19 @@ int main() {
   const auto sortedWorldDraw = buildPipeline<Rendering::Phases::SortedWorld>(world);
 
   const auto moveUpdate = buildPipeline<Movement::Phases::Update>(world);
-  // cameraFollow pipeline kept for ECS phase completeness; no systems run in it.
-  [[maybe_unused]] const auto cameraFollow = buildPipeline<Movement::Phases::CameraFollow>(world);
-
   const auto characterUpdate = buildPipeline<Character::Phases::Update>(world);
 
+  // One pipeline per Simulation phase; the fixed-step loop below runs them in
+  // the order they are declared in Simulation.h.
   const auto prePhysics = buildPipeline<Simulation::PrePhysics>(world);
   const auto physicsStep = buildPipeline<Simulation::PhysicsStep>(world);
   const auto postPhysics = buildPipeline<Simulation::PostPhysics>(world);
+  const auto postPhysicsEvents = buildPipeline<Simulation::PostPhysicsEvents>(world);
   const auto fixedUpdate = buildPipeline<Simulation::FixedUpdate>(world);
+  const auto fixedUpdateLate = buildPipeline<Simulation::FixedUpdateLate>(world);
 
   // The visible world is fixed at 640x360 world units regardless of window size.
-  auto &logicalView = world.get_mut<Rendering::LogicalViewSize>();
+  auto &logicalView = world.get_mut<Core::LogicalViewSize>();
   logicalView.value = Vector2{static_cast<float>(BASE_WIDTH), static_cast<float>(BASE_HEIGHT)};
 
   // Native = the scene buffer follows the window at an integer zoom, which is
@@ -188,12 +186,17 @@ int main() {
     // Alt+Enter, not F11: F11 is already the screenshot key (Debug::ScreenshotCapture).
     const bool altHeld = IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
     if (!consoleIsOpen && altHeld && (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_KP_ENTER))) {
-      ToggleBorderlessWindowed();
+      GameWindow::ToggleFullscreen();
     }
 
     const auto frameTime = GetFrameTime();
     screenshotCapture.Update(frameTime);
     Rendering::UpdateLoadingScreen(world, frameTime);
+
+    // After UpdateLoadingScreen (a loading step is what requests the first map)
+    // and before any system runs, so the map is materialised outside flecs'
+    // deferred scope. See MapManager::ProcessPendingMapLoad.
+    MapManager::ProcessPendingMapLoad(world);
 
     const bool loadingScreenVisible = Rendering::IsLoadingScreenVisible(world);
     frameStepper.UpdateControls(!loadingScreenVisible && !consoleIsOpen);
@@ -221,24 +224,27 @@ int main() {
       while (accumulator >= fixedTimeStep) {
         // Snapshot positions BEFORE physics so the interpolation range is
         // [previous tick end, current tick end], not [current, next].
-        world.each([](const Rendering::Position &pos, Rendering::PreviousPosition &prev) {
+        world.each([](const Core::Position &pos, Core::PreviousPosition &prev) {
           prev.value = pos.value;
         });
 
         ecs_run_pipeline(world, prePhysics, fixedTimeStep);
         ecs_run_pipeline(world, physicsStep, fixedTimeStep);
         ecs_run_pipeline(world, postPhysics, fixedTimeStep);
+        ecs_run_pipeline(world, postPhysicsEvents, fixedTimeStep);
         ecs_run_pipeline(world, fixedUpdate, fixedTimeStep);
+        ecs_run_pipeline(world, fixedUpdateLate, fixedTimeStep);
         ecs_run_pipeline(world, characterUpdate, fixedTimeStep);
-        // cameraFollow removed: camera is now updated per render frame below.
+        // Camera follow is updated per render frame below, not here.
         frameStepper.RecordFixedStep();
         accumulator -= fixedTimeStep;
       }
     }
 
-    // Re-derive the scene buffer density if the window changed (Native only).
-    // Must run before the camera update so it quantises against the new grid.
-    Rendering::UpdateAutoSceneResolution(world);
+    // Re-derive everything that depends on the window size (scene buffer
+    // density in Native mode, and the output scale). Must run before the camera
+    // update so it quantises against the new grid.
+    Rendering::UpdateOutputGeometry(world);
 
     // --- Per-render-frame render preparation ---
     // 1. Interpolate simulation positions. While paused there is no partial
@@ -260,7 +266,7 @@ int main() {
         const float cameraDeltaTime = frameStepper.IsStepRequested() ? fixedTimeStep : frameTime;
         const auto playerEntity = world.lookup("Player");
         if (playerEntity.is_valid()) {
-          const auto *rp = playerEntity.try_get<Rendering::RenderPosition>();
+          const auto *rp = playerEntity.try_get<Core::RenderPosition>();
           if (rp) {
             GameCamera::UpdateRenderCamera(world, rp->interpolated, cameraDeltaTime);
           }
@@ -297,6 +303,25 @@ int main() {
   }
 
   world.quit();
+}
+
+int main() {
+
+  // The scene buffer is a fixed size, so the window size only affects the final
+  // blit rectangle (see Rendering::PresentFrame). Even so, the window is not
+  // freely resizable: only the GameWindow presets and fullscreen are allowed.
+  InitWindow(
+      GameWindow::kPresets[STARTUP_PRESET].width,
+      GameWindow::kPresets[STARTUP_PRESET].height,
+      "raylib game cpp");
+  // Now that a monitor is known, fall back to fullscreen if the preset does not
+  // fit on it, and centre the window otherwise.
+  GameWindow::ApplyPreset(STARTUP_PRESET);
+  SetExitKey(KEY_NULL);
+  SetTargetFPS(60);
+
+  RunGame();
+
   GameConsole::Shutdown();
   Rendering::Shutdown();
   CloseWindow();
