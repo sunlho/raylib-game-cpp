@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <iostream>
 #include <utility>
 
@@ -8,6 +9,7 @@
 #include "modules/Character/Character.h"
 #include "modules/Console/Console.h"
 #include "modules/Console/Register.h"
+#include "modules/Core/Core.h"
 #include "modules/Debug/DebugDraw.h"
 #include "modules/Debug/FrameStepper.h"
 #include "modules/Debug/Screenshot.h"
@@ -16,20 +18,11 @@
 #include "modules/Physics.h"
 #include "modules/Reflection.h"
 #include "modules/Rendering.h"
-#include "modules/Simulation.h"
 #include "modules/Stairs/Stairs.h"
 #include "modules/Utils.h"
+#include "modules/Window.h"
 
-// constexpr int SCREEN_WIDTH = 2560;
-// constexpr int SCREEN_HEIGHT = 1440;
-// constexpr int SCREEN_WIDTH = 1920;
-// constexpr int SCREEN_HEIGHT = 1080;
-// constexpr int SCREEN_WIDTH = 1600;
-// constexpr int SCREEN_HEIGHT = 900;
-constexpr int SCREEN_WIDTH = 1280;
-constexpr int SCREEN_HEIGHT = 720;
-constexpr int BASE_WIDTH = 640;
-constexpr int BASE_HEIGHT = 360;
+constexpr int STARTUP_PRESET = GameWindow::kDefaultPreset;
 
 static bool isDebugDrawEnabled = false;
 
@@ -61,42 +54,41 @@ static ecs_entity_t CreatePlayer(flecs::world &world) {
       .set<Character::AnimationController>({})
       .set<Character::IdleBehavior>({})
       .set<Character::SpriteSet>(std::move(playerSprites))
-      .set<Rendering::Position>({playerStart})
+      .set<Core::Position>({playerStart})
+      .set<Core::PreviousPosition>({playerStart})
+      .set<Core::RenderPosition>({playerStart, playerStart})
       .set<Stairs::FloorState>({2.5f, 2.5f})
       .set<Movement::Velocity>({Vector2{0.0f, 0.0f}})
       .set<Movement::MoveSpeed>({100.0f})
       .set<Movement::RunSettings>({1.6f, 0.2f})
       .set<Movement::RunState>({});
 
-  auto &mainCamera = world.get_mut<GameCamera::MainCamera>();
-  const auto &renderTargetSize = world.get<Rendering::RenderTargetSize>();
-  mainCamera.value.offset = Vector2{renderTargetSize.dimension.x * 0.5f, renderTargetSize.dimension.y * 0.5f};
-  mainCamera.value.target = playerStart;
+  GameCamera::SnapCameraTo(world, playerStart);
   return player.id();
 }
 
 static void UpdateLoadingRevealCenter(flecs::world &world) {
   const auto player = world.lookup("Player");
-  if (!player.is_valid() || !player.has<Rendering::Position>()) {
+  if (!player.is_valid() || !player.has<Core::Position>()) {
     return;
   }
 
-  const auto &position = player.get<Rendering::Position>();
+  // Use quantised render position for the reveal centre when available so the
+  // circle follows the pixel-aligned player position.
+  const auto *rp = player.try_get<Core::RenderPosition>();
+  const auto &pos = player.get<Core::Position>();
+  const Vector2 worldPos = rp ? rp->quantized : pos.value;
   const auto &mainCamera = world.get<GameCamera::MainCamera>();
-  Rendering::SetLoadingRevealCenter(world, GetWorldToScreen2D(position.value, mainCamera.value));
+  Rendering::SetLoadingRevealCenter(world, GetWorldToScreen2D(worldPos, mainCamera.value));
 }
 
-int main() {
-
-  InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "raylib game cpp");
-  SetExitKey(KEY_NULL);
-  SetTargetFPS(60);
-
+static void RunGame() {
   flecs::world world;
   world.set<flecs::Rest>({});
   world.import<flecs::stats>();
   ecs_entity_t dequeue_rest = ecs_lookup(world, "flecs.rest.DequeueRest");
 
+  world.import<Core::module>();
   world.import<Rendering::module>();
   world.import<GameConsole::module>();
   world.import<GameCamera::module>();
@@ -113,17 +105,16 @@ int main() {
   const auto sortedWorldDraw = buildPipeline<Rendering::Phases::SortedWorld>(world);
 
   const auto moveUpdate = buildPipeline<Movement::Phases::Update>(world);
-  const auto cameraFollow = buildPipeline<Movement::Phases::CameraFollow>(world);
-
   const auto characterUpdate = buildPipeline<Character::Phases::Update>(world);
 
   const auto prePhysics = buildPipeline<Simulation::PrePhysics>(world);
   const auto physicsStep = buildPipeline<Simulation::PhysicsStep>(world);
   const auto postPhysics = buildPipeline<Simulation::PostPhysics>(world);
+  const auto postPhysicsEvents = buildPipeline<Simulation::PostPhysicsEvents>(world);
   const auto fixedUpdate = buildPipeline<Simulation::FixedUpdate>(world);
+  const auto fixedUpdateLate = buildPipeline<Simulation::FixedUpdateLate>(world);
 
-  auto &renderTargetSize = world.get_mut<Rendering::RenderTargetSize>();
-  renderTargetSize.dimension = Vector2{static_cast<float>(BASE_WIDTH), static_cast<float>(BASE_HEIGHT)};
+  Rendering::SetSceneResolution(world, Rendering::SceneResolution::Native);
 
   float fixedTimeStep = 1.0f / 60.0f;
   float accumulator = 0.0f;
@@ -163,9 +154,15 @@ int main() {
       break;
     }
 
+    if (!consoleIsOpen && IsKeyDown(KEY_F11)) {
+      GameWindow::ToggleFullscreen();
+    }
+
     const auto frameTime = GetFrameTime();
     screenshotCapture.Update(frameTime);
     Rendering::UpdateLoadingScreen(world, frameTime);
+
+    MapManager::ProcessPendingMapLoad(world);
 
     const bool loadingScreenVisible = Rendering::IsLoadingScreenVisible(world);
     frameStepper.UpdateControls(!loadingScreenVisible && !consoleIsOpen);
@@ -173,8 +170,6 @@ int main() {
       screenshotCapture.RequestCapture();
     }
     if (frameStepper.DidPauseStateChange()) {
-      // Discard partial/catch-up time at pause boundaries so one requested
-      // frame always maps to exactly one fixed simulation step.
       accumulator = 0.0f;
     }
 
@@ -187,17 +182,59 @@ int main() {
 
     if (!loadingScreenVisible && frameStepper.ShouldAdvanceSimulation()) {
       const float simulationFrameTime = frameStepper.IsStepRequested() ? fixedTimeStep : frameTime;
-      accumulator += simulationFrameTime;
+      accumulator += std::min(simulationFrameTime, 0.25f);
       while (accumulator >= fixedTimeStep) {
+        // Snapshot positions BEFORE physics so the interpolation range is
+        // [previous tick end, current tick end], not [current, next].
+        world.each([](const Core::Position &pos, Core::PreviousPosition &prev) {
+          prev.value = pos.value;
+        });
+
         ecs_run_pipeline(world, prePhysics, fixedTimeStep);
         ecs_run_pipeline(world, physicsStep, fixedTimeStep);
         ecs_run_pipeline(world, postPhysics, fixedTimeStep);
+        ecs_run_pipeline(world, postPhysicsEvents, fixedTimeStep);
         ecs_run_pipeline(world, fixedUpdate, fixedTimeStep);
+        ecs_run_pipeline(world, fixedUpdateLate, fixedTimeStep);
         ecs_run_pipeline(world, characterUpdate, fixedTimeStep);
-        ecs_run_pipeline(world, cameraFollow, fixedTimeStep);
+        // Camera follow is updated per render frame below, not here.
         frameStepper.RecordFixedStep();
         accumulator -= fixedTimeStep;
       }
+    }
+
+    // Re-derive everything that depends on the window size (scene buffer
+    // density in Native mode, and the output scale). Must run before the camera
+    // update so it quantises against the new grid.
+    Rendering::UpdateOutputGeometry(world);
+
+    // --- Per-render-frame render preparation ---
+    // 1. Interpolate simulation positions. While paused there is no partial
+    //    tick to blend, so show the last completed tick (alpha = 1) instead of
+    //    snapping back to PreviousPosition.
+    const float renderAlpha = frameStepper.IsPaused() ? 1.0f : std::clamp(accumulator / fixedTimeStep, 0.0f, 1.0f);
+    if (!loadingScreenVisible) {
+      Rendering::InterpolatePositions(world, renderAlpha);
+
+      // 2. Update the smooth camera using the interpolated player position.
+      //    Must happen before QuantizeRenderPositions so camera.renderTarget is ready.
+      //    The camera is part of the simulation's visible state, so it only
+      //    advances when the simulation does; otherwise its exponential damping
+      //    would keep closing on the player while the world is frozen. A single
+      //    step advances it by exactly one fixed tick, not by real frame time.
+      if (frameStepper.ShouldAdvanceSimulation()) {
+        const float cameraDeltaTime = frameStepper.IsStepRequested() ? fixedTimeStep : frameTime;
+        const auto playerEntity = world.lookup("Player");
+        if (playerEntity.is_valid()) {
+          const auto *rp = playerEntity.try_get<Core::RenderPosition>();
+          if (rp) {
+            GameCamera::UpdateRenderCamera(world, rp->interpolated, cameraDeltaTime);
+          }
+        }
+      }
+
+      // 3. Quantise all dynamic entities relative to the final camera position.
+      Rendering::QuantizeRenderPositions(world);
     }
 
     Rendering::BeginFrame(world);
@@ -226,7 +263,20 @@ int main() {
   }
 
   world.quit();
+}
+
+int main() {
+
+  InitWindow(GameWindow::kPresets[STARTUP_PRESET].width, GameWindow::kPresets[STARTUP_PRESET].height, "raylib game cpp");
+
+  GameWindow::ApplyPreset(STARTUP_PRESET);
+  SetExitKey(KEY_NULL);
+  SetTargetFPS(60);
+
+  RunGame();
+
   GameConsole::Shutdown();
+  Rendering::Shutdown();
   CloseWindow();
 
   return 0;

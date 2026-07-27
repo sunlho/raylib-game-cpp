@@ -7,7 +7,6 @@ namespace Movement {
 
 struct Phases {
   struct Update {};
-  struct CameraFollow {};
 };
 
 struct Velocity {

@@ -79,10 +79,14 @@ flecs::entity GenerateImplicitReflectionBinds(flecs::world &world) {
     }
   } else {
     const auto names = boost::pfr::names_as_array<T>();
-    T *dummy = nullptr;
 
-    boost::pfr::for_each_field(*dummy, [&]<typename MemberType>(const MemberType &value, std::size_t i) {
-      printf("Testing %s %s\n", names[i].data(), typeid(MemberType).name());
+    // A real instance, not `*(T*)nullptr`: forming references to members of a
+    // null object is undefined behaviour, and the member offsets it yields are
+    // only correct by accident. This runs once per type at startup, so the cost
+    // of constructing one is irrelevant.
+    T probe{};
+
+    boost::pfr::for_each_field(probe, [&]<typename MemberType>(const MemberType &value, std::size_t i) {
       if (!world.component<MemberType>().template has<flecs::Type>() && !world.component<MemberType>().template has<EcsOpaque>()) {
         if constexpr (std::is_aggregate_v<MemberType>) {
           GenerateImplicitReflectionBinds<MemberType>(world);
@@ -94,13 +98,17 @@ flecs::entity GenerateImplicitReflectionBinds(flecs::world &world) {
             GenerateImplicitReflectionBinds<typename MemberType::value_type>(world);
           }
         } else if constexpr (!std::is_pointer_v<MemberType>) {
-          printf("Skipping %s\n", typeid(MemberType).name());
+          // No reflection support for this member type (std::string,
+          // std::unordered_map, ...); leave it out of the struct description.
           return;
         }
       }
       const void *vptr = static_cast<const void *>(&value);
-      ptrdiff_t offset = static_cast<const uint8_t *>(vptr) - reinterpret_cast<const uint8_t *>(dummy);
-      cmp.member<MemberType>(names[i].data(), std::extent_v<MemberType>, offset);
+      const ptrdiff_t offset = static_cast<const uint8_t *>(vptr) - reinterpret_cast<const uint8_t *>(&probe);
+      // std::extent_v is 0 for every non-array member, which is not a valid
+      // element count; scalars are a single element.
+      constexpr int32_t elementCount = std::extent_v<MemberType> > 0 ? static_cast<int32_t>(std::extent_v<MemberType>) : 1;
+      cmp.member<MemberType>(names[i].data(), elementCount, offset);
     });
   }
 

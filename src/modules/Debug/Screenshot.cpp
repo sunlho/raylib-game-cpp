@@ -50,7 +50,7 @@ std::filesystem::path MakeScreenshotPath(const std::filesystem::path &directory)
 
 void ScreenshotCapture::Update(float deltaTime) {
   notificationTimeRemaining_ = std::max(0.0f, notificationTimeRemaining_ - std::max(deltaTime, 0.0f));
-  if (IsKeyPressed(KEY_F11)) {
+  if (IsKeyPressed(KEY_F2)) {
     RequestCapture();
   }
 }

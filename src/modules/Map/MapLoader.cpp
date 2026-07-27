@@ -9,6 +9,7 @@
 #include "Map.h"
 #include "MapInternal.h"
 
+#include "modules/Camera.h"
 #include "modules/Stairs/Stairs.h"
 #include "modules/Tilemap/Tilemap.h"
 
@@ -35,9 +36,9 @@ void DestroyCurrentMap(MapState &mapState) {
 }
 
 void ClearMapData(flecs::world &world) {
-  auto &mapBounds = world.get_mut<MapBounds>();
-  mapBounds.dimension = Vector2{0.0f, 0.0f};
-  world.modified<MapBounds>();
+  auto &worldBounds = world.get_mut<Core::WorldBounds>();
+  worldBounds.dimension = Vector2{0.0f, 0.0f};
+  world.modified<Core::WorldBounds>();
 
   auto &activeData = world.get_mut<ActiveMapData>();
   activeData.textureBank.reset();
@@ -52,11 +53,8 @@ void ClearMapData(flecs::world &world) {
 void SpawnStairs(flecs::world &world, const Tilemap::LoadedMap &loadedMap, flecs::entity mapRoot) {
   for (std::size_t stairIndex = 0; stairIndex < loadedMap.stairs.size(); ++stairIndex) {
     const std::string stairName = std::format("MapStair_{}", stairIndex);
-    auto stairEntity = world.entity(stairName.c_str());
 
-    if (mapRoot.is_valid()) {
-      stairEntity.add(flecs::ChildOf, mapRoot);
-    }
+    auto stairEntity = mapRoot.is_valid() ? world.entity(flecs::Parent{mapRoot}, stairName.c_str()) : world.entity(stairName.c_str());
 
     stairEntity.set<Stairs::StairData>(loadedMap.stairs[stairIndex]);
   }
@@ -66,11 +64,8 @@ flecs::entity EnsureLayerGroup(flecs::world &world, std::unordered_map<int, flec
   auto [groupIt, inserted] = layerGroups.try_emplace(layerIndex);
   if (inserted) {
     const std::string layerName = "MapLayer_" + std::to_string(layerIndex);
-    auto layerEntity = world.entity(layerName.c_str());
 
-    if (mapRoot.is_valid()) {
-      layerEntity.add(flecs::ChildOf, mapRoot);
-    }
+    auto layerEntity = mapRoot.is_valid() ? world.entity(flecs::Parent{mapRoot}, layerName.c_str()) : world.entity(layerName.c_str());
 
     groupIt->second = layerEntity;
   }
@@ -153,20 +148,22 @@ std::size_t CountTiles(const Tilemap::LoadedMap &loadedMap) {
   return count;
 }
 
-void LoadMapFromPath(flecs::world world, const MapPath &mapPath) {
+} // namespace
+
+void LoadMapFromPath(flecs::world &world, const std::string &path) {
   auto &mapState = world.get_mut<MapState>();
-  if (mapState.currentPath == mapPath.value && mapState.mapRoot.is_valid()) {
+  if (mapState.currentPath == path && mapState.mapRoot.is_valid()) {
     return;
   }
 
   auto &cacheState = world.get_mut<MapCacheState>();
   const std::size_t hitCountBefore = cacheState.hitCount;
   const auto sourceStart = Clock::now();
-  auto *loadedMap = GetOrLoadMap(cacheState, mapPath.value);
+  auto *loadedMap = GetOrLoadMap(cacheState, path);
   const auto sourceEnd = Clock::now();
   const double sourceMilliseconds = ElapsedMilliseconds(sourceStart, sourceEnd);
   if (!loadedMap) {
-    TraceLog(LOG_WARNING, "Map switch failed for '%s' during source/cache acquisition after %.3f ms", mapPath.value.c_str(), sourceMilliseconds);
+    TraceLog(LOG_WARNING, "Map switch failed for '%s' during source/cache acquisition after %.3f ms", path.c_str(), sourceMilliseconds);
     return;
   }
   const bool cacheHit = cacheState.hitCount > hitCountBefore;
@@ -180,13 +177,22 @@ void LoadMapFromPath(flecs::world world, const MapPath &mapPath) {
   ClearMapData(world);
 
   mapState.mapRoot = world.entity("MapRoot");
-  mapState.currentPath = mapPath.value;
+  mapState.currentPath = path;
 
   SpawnStairs(world, *loadedMap, mapState.mapRoot);
 
-  auto &mapBounds = world.get_mut<MapBounds>();
-  mapBounds.dimension = loadedMap->dimensions;
-  world.modified<MapBounds>();
+  auto &worldBounds = world.get_mut<Core::WorldBounds>();
+  worldBounds.dimension = loadedMap->dimensions;
+  world.modified<Core::WorldBounds>();
+
+  // The camera clamps against WorldBounds, so its smoothed state is stale the
+  // moment the bounds change: leaving it alone makes the camera fly over from
+  // wherever it was on the previous map, and a smaller map leaves it out of
+  // bounds until the damping catches up. No player yet on the very first load --
+  // main() snaps the camera when it spawns one.
+  if (const auto player = world.lookup("Player"); player.is_valid() && player.has<Core::Position>()) {
+    GameCamera::SnapCameraTo(world, player.get<Core::Position>().value);
+  }
 
   auto &activeData = world.get_mut<ActiveMapData>();
   activeData.textureBank = loadedMap->textureBank;
@@ -206,7 +212,7 @@ void LoadMapFromPath(flecs::world world, const MapPath &mapPath) {
   TraceLog(
       preloadStats.failed == 0 ? LOG_INFO : LOG_WARNING,
       "Map switch '%s': source/cache=%.3f ms (%s), texture preload=%.3f ms (%llu requested, %llu ready, %llu failed), world materialization=%.3f ms (%llu chunks, %llu tiles, %llu stairs)",
-      mapPath.value.c_str(),
+      path.c_str(),
       sourceMilliseconds,
       cacheHit ? "cache hit" : "source load",
       preloadMilliseconds,
@@ -217,17 +223,6 @@ void LoadMapFromPath(flecs::world world, const MapPath &mapPath) {
       chunkCount,
       tileCount,
       stairCount);
-}
-
-} // namespace
-
-void RegisterMapLoader(flecs::world &world) {
-  world.observer<const MapPath>("Load Map Observer")
-      .event(flecs::OnSet)
-      .each([](flecs::entity entity, const MapPath &mapPath) {
-        auto world = entity.world();
-        LoadMapFromPath(world, mapPath);
-      });
 }
 
 } // namespace MapManager::Internal

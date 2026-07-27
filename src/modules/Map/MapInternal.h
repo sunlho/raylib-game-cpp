@@ -16,6 +16,8 @@
 
 namespace MapManager::Internal {
 
+// The requested map. MapState::currentPath is the loaded one; the two differing
+// IS the pending request, so no separate dirty flag can go out of sync.
 struct MapPath {
   std::string value;
 };
@@ -68,13 +70,14 @@ Tilemap::LoadedMap *GetOrLoadMap(MapCacheState &cacheState, const std::string &p
 class TileRenderable final : public Rendering::Renderable, Tilemap::ChunkTile {
 public:
   TileRenderable(std::shared_ptr<const Tilemap::TilemapTextureBank> bank, const Tilemap::ChunkTile &tile);
-  void Draw(const Rendering::Position &position) const override;
+  // Ignores the position: a chunk tile's destRect is already in world space.
+  void Draw(const Core::Position &) const override;
 
 private:
   std::shared_ptr<const Tilemap::TilemapTextureBank> textureBank;
 };
 
-void RegisterMapLoader(flecs::world &world);
+void LoadMapFromPath(flecs::world &world, const std::string &path);
 void RegisterMapRendering(flecs::world &world);
 
 } // namespace MapManager::Internal

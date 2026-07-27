@@ -1,15 +1,15 @@
 #include "CharacterInternal.h"
 
+#include "modules/Core/Transform.h"
 #include "modules/Physics.h"
-#include "modules/Rendering.h"
 
 namespace Character::Internal {
 
 void RegisterCharacterPhysics(flecs::world &world) {
-  world.observer<const Rendering::Position>("Create Character Physics Observer")
+  world.observer<const Core::Position>("Create Character Physics Observer")
       .with<PlayerTag>()
       .event(flecs::OnSet)
-      .each([](flecs::entity entity, const Rendering::Position &position) {
+      .each([](flecs::entity entity, const Core::Position &position) {
         if (const auto *body = entity.try_get<Physics::PhysicsBody>()) {
           Physics::Relocate(*body, position.value);
           return;

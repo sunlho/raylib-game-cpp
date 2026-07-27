@@ -10,20 +10,23 @@ namespace Character::Internal {
 CharacterRenderable::CharacterRenderable(flecs::entity entity) : entity_(entity) {
 }
 
-void CharacterRenderable::Draw(const Rendering::Position &position) const {
-  auto spriteSet = entity_.get<SpriteSet>();
-  auto controller = entity_.get<AnimationController>();
-
-  if (!spriteSet.loaded) {
+void CharacterRenderable::Draw(const Core::Position &position) const {
+  // Bind by pointer, never by value: get<T>() returns const T&, so `auto` would
+  // deep-copy the whole SpriteSet (every decoded animation frame of every clip)
+  // on every draw call. try_get_mut is required because animation.lastFrame is
+  // the upload cache below and has to survive across frames.
+  auto *spriteSet = entity_.try_get_mut<SpriteSet>();
+  const auto *controller = entity_.try_get<AnimationController>();
+  if (!spriteSet || !controller || !spriteSet->loaded) {
     return;
   }
 
-  const auto *clip = controller.GetCurrentAnimation();
+  const auto *clip = controller->GetCurrentAnimation();
   if (!clip) {
     return;
   }
 
-  auto *entry = spriteSet.FindEntry(clip->name);
+  auto *entry = spriteSet->FindEntry(clip->name);
   if (!entry) {
     return;
   }
@@ -33,7 +36,7 @@ void CharacterRenderable::Draw(const Rendering::Position &position) const {
     return;
   }
 
-  int frame = controller.currentFrame;
+  int frame = controller->currentFrame;
   if (frame < 0) {
     frame = 0;
   }
@@ -55,29 +58,30 @@ void CharacterRenderable::Draw(const Rendering::Position &position) const {
       static_cast<float>(animation.width),
       static_cast<float>(animation.height)};
   Vector2 renderPosition = position.value;
-  if (entity_.has<Movement::CameraFollowTag>()) {
-    const auto &mainCamera = entity_.world().get<GameCamera::MainCamera>();
-    if (mainCamera.useFollowRenderPosition) {
-      renderPosition = mainCamera.followRenderPosition;
-    }
+  // Use the camera-relative quantized render position when available.
+  // This replaces the old camera-follow special case and makes all dynamic
+  // entities use the same quantisation rule.
+  const Core::RenderPosition *rp = entity_.try_get<Core::RenderPosition>();
+  if (rp) {
+    renderPosition = rp->quantized;
   }
 
   Rectangle dest = {
       renderPosition.x,
       renderPosition.y,
-      static_cast<float>(animation.width) * spriteSet.scale,
-      static_cast<float>(animation.height) * spriteSet.scale};
-  dest.x = roundf(dest.x);
-  dest.y = roundf(dest.y);
-  Vector2 origin = spriteSet.useCenterOrigin ? Vector2{roundf(dest.width * 0.5f), roundf(dest.height * 0.5f)} : spriteSet.origin;
+      static_cast<float>(animation.width) * spriteSet->scale,
+      static_cast<float>(animation.height) * spriteSet->scale};
+  // No roundf() here: quantisation was already applied by QuantizeForCamera
+  // in Rendering::PrepareRenderFrame. Double-rounding would break the 0.5-unit grid.
+  Vector2 origin = spriteSet->useCenterOrigin ? Vector2{roundf(dest.width * 0.5f), roundf(dest.height * 0.5f)} : spriteSet->origin;
 
   DrawTexturePro(animation.texture, src, dest, origin, 0.0f, WHITE);
 }
 
 void RegisterCharacterRendering(flecs::world &world) {
-  world.observer<SpriteSet, const AnimationController, const Rendering::Position>("Create Character Renderable Observer")
+  world.observer<SpriteSet, const AnimationController, const Core::Position>("Create Character Renderable Observer")
       .event(flecs::OnSet)
-      .each([](flecs::entity entity, SpriteSet &spriteSet, const AnimationController &controller, const Rendering::Position &position) {
+      .each([](flecs::entity entity, SpriteSet &spriteSet, const AnimationController &controller, const Core::Position &position) {
         CharacterRenderable renderable(entity);
         auto renderablePtr = std::make_shared<CharacterRenderable>(entity);
         Rendering::RenderComponent renderComponent;

@@ -119,7 +119,9 @@ void DrawWindow(flecs::world &world, ConsoleState &state) {
 
   if (!ImGui::Begin("Console", &visible, flags)) {
     ImGui::End();
-    state.open = visible;
+    if (!visible) {
+      state.open = false;
+    }
     return;
   }
 
@@ -172,7 +174,12 @@ void DrawWindow(flecs::world &world, ConsoleState &state) {
   }
 
   ImGui::End();
-  state.open = visible;
+  // Only honour ImGui's own close button. Writing `visible` back unconditionally
+  // would resurrect the pre-Execute value and undo a command that closed the
+  // console itself (e.g. "tp", which calls SetOpen(world, false)).
+  if (!visible) {
+    state.open = false;
+  }
 }
 
 } // namespace Internal

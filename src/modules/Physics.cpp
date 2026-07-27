@@ -7,11 +7,11 @@
 
 #include "box2d/box2d.h"
 
+#include "Core/Simulation.h"
+#include "Core/Transform.h"
 #include "Debug/PhysicsDebugDraw.h"
 #include "Movement.h"
 #include "Physics.h"
-#include "Rendering.h"
-#include "Simulation.h"
 
 namespace Physics {
 namespace {
@@ -233,9 +233,9 @@ module::module(flecs::world &world) {
         CaptureSensorEvents(physicsWorld);
       });
 
-  world.system<Rendering::Position, const PhysicsBody>("Sync Physics Positions")
+  world.system<Core::Position, const PhysicsBody>("Sync Physics Positions")
       .kind<Simulation::PostPhysics>()
-      .each([](Rendering::Position &position, const PhysicsBody &body) {
+      .each([](Core::Position &position, const PhysicsBody &body) {
         const b2BodyId bodyId = PhysicsAccess::BodyId(body);
         if (!b2Body_IsValid(bodyId)) {
           return;
