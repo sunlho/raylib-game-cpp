@@ -97,11 +97,17 @@ struct TilemapTextureBank {
   ~TilemapTextureBank();
 };
 
+struct SpawnPoint {
+  std::string name;
+  Vector2 position = {0.0f, 0.0f};
+};
+
 struct LoadedMap {
   Vector2 dimensions = {0.0f, 0.0f};
   std::shared_ptr<TilemapTextureBank> textureBank;
   std::vector<Chunk> chunks;
   std::vector<Stairs::StairData> stairs;
+  std::vector<SpawnPoint> spawnPoints;
   int tileWidth = 0;
   int tileHeight = 0;
   int chunkPixelWidth = 0;

@@ -1,6 +1,8 @@
 #pragma once
 
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "flecs.h"
 #include "raylib.h"
@@ -12,6 +14,17 @@ namespace MapManager {
 // Core::WorldBounds.
 void SetMapPath(flecs::world &world, const std::string &path);
 bool TransitionToMap(flecs::world &world, std::string path, std::string hint = "Loading map...");
+bool ReloadCurrentMap(flecs::world &world, std::string hint = "Reloading map...");
+
+std::string GetCurrentMapPath(const flecs::world &world);
+bool FindSpawnPoint(const flecs::world &world, std::string_view name, Vector2 &position);
+std::vector<std::string> GetSpawnPointNames(const flecs::world &world);
+bool FindSpawnPoint(
+    flecs::world &world,
+    const std::string &mapPath,
+    std::string_view name,
+    Vector2 &position);
+std::vector<std::string> GetSpawnPointNames(flecs::world &world, const std::string &mapPath);
 
 // Materialises a pending map request, if any.
 //

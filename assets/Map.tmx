@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<map version="1.10" tiledversion="1.12.2" orientation="orthogonal" renderorder="right-down" width="70" height="70" tilewidth="34" tileheight="24" infinite="0" nextlayerid="21" nextobjectid="60">
+<map version="1.10" tiledversion="1.12.2" orientation="orthogonal" renderorder="right-down" width="70" height="70" tilewidth="34" tileheight="24" infinite="0" nextlayerid="21" nextobjectid="61">
  <tileset firstgid="1" source="glass.tsx"/>
  <tileset firstgid="81" source="object.tsx"/>
  <layer id="1" name="ground-1" width="70" height="70">
@@ -227,7 +227,7 @@
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 </data>
  </layer>
- <objectgroup id="20" name="Object">
+ <objectgroup id="20" name="Objects">
   <object id="51" gid="82" x="868" y="924" width="66" height="48"/>
   <object id="57" type="Stairs" x="868" y="876" width="66" height="48">
    <properties>
@@ -235,6 +235,9 @@
     <property name="highFloor" type="float" value="2.5"/>
     <property name="lowFloor" type="float" value="1.5"/>
    </properties>
+  </object>
+  <object id="60" name="Spawn1" type="Spawn" x="340" y="240">
+   <point/>
   </object>
  </objectgroup>
  <layer id="17" name="ground-4" width="70" height="70">
@@ -316,10 +319,10 @@
  </layer>
  <objectgroup id="19" name="Collisions" class="Collisions">
   <object id="53" x="662" y="396">
-   <polygon points="0,0 204,0 204,-72 716,-72 716,24 784,24 784,465 750,465 750,513 272,513 272,480 279,480 279,500 743,500 743,452 777,452 777,28 708,28 708,-68 210,-68 210,4 6,4 6,428 109,428 109,500 200,500 200,480 206,480 206,513 102,513 102,441 0,441"/>
+   <polygon points="0,0 204,0 204,-72 716,-72 716,24 784,24 784,465 750,465 750,513 272,513 272,480 279,480 279,500 743,500 743,452 777,452 778,28 710,28 710,-68 210,-68 210,4 6,4 6,428 109,428 109,500 200,500 200,480 206,480 206,513 102,513 102,441 0,441"/>
   </object>
   <object id="59" x="1002" y="972">
-   <polygon points="0,0 342,0 342,105 240,105 240,92 335,92 335,4 6,4 6,92 240,92 240,105 0,105"/>
+   <polygon points="0,0 342,0 342,105 240,105 240,92 336,92 336,4 6,4 6,92 240,92 240,105 0,105"/>
   </object>
  </objectgroup>
 </map>

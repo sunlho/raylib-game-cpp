@@ -44,6 +44,7 @@ void ClearMapData(flecs::world &world) {
   activeData.textureBank.reset();
   activeData.staticTiles.clear();
   activeData.sortableTiles.clear();
+  activeData.spawnPoints.clear();
   activeData.tileWidth = 0;
   activeData.tileHeight = 0;
   activeData.chunkPixelWidth = 0;
@@ -150,13 +151,20 @@ std::size_t CountTiles(const Tilemap::LoadedMap &loadedMap) {
 
 } // namespace
 
-void LoadMapFromPath(flecs::world &world, const std::string &path) {
+void LoadMapFromPath(flecs::world &world, const std::string &path, bool forceReload) {
   auto &mapState = world.get_mut<MapState>();
-  if (mapState.currentPath == path && mapState.mapRoot.is_valid()) {
+  if (!forceReload && mapState.currentPath == path && mapState.mapRoot.is_valid()) {
     return;
   }
 
   auto &cacheState = world.get_mut<MapCacheState>();
+  if (forceReload) {
+    const auto cached = cacheState.cache.find(path);
+    if (cached != cacheState.cache.end()) {
+      cacheState.usageOrder.erase(cached->second.lruIt);
+      cacheState.cache.erase(cached);
+    }
+  }
   const std::size_t hitCountBefore = cacheState.hitCount;
   const auto sourceStart = Clock::now();
   auto *loadedMap = GetOrLoadMap(cacheState, path);
@@ -196,6 +204,7 @@ void LoadMapFromPath(flecs::world &world, const std::string &path) {
 
   auto &activeData = world.get_mut<ActiveMapData>();
   activeData.textureBank = loadedMap->textureBank;
+  activeData.spawnPoints = loadedMap->spawnPoints;
   activeData.tileWidth = loadedMap->tileWidth;
   activeData.tileHeight = loadedMap->tileHeight;
   activeData.chunkPixelWidth = loadedMap->chunkPixelWidth;
@@ -209,9 +218,10 @@ void LoadMapFromPath(flecs::world &world, const std::string &path) {
   const auto chunkCount = static_cast<unsigned long long>(loadedMap->chunks.size());
   const auto tileCount = static_cast<unsigned long long>(CountTiles(*loadedMap));
   const auto stairCount = static_cast<unsigned long long>(loadedMap->stairs.size());
+  const auto spawnPointCount = static_cast<unsigned long long>(loadedMap->spawnPoints.size());
   TraceLog(
       preloadStats.failed == 0 ? LOG_INFO : LOG_WARNING,
-      "Map switch '%s': source/cache=%.3f ms (%s), texture preload=%.3f ms (%llu requested, %llu ready, %llu failed), world materialization=%.3f ms (%llu chunks, %llu tiles, %llu stairs)",
+      "Map switch '%s': source/cache=%.3f ms (%s), texture preload=%.3f ms (%llu requested, %llu ready, %llu failed), world materialization=%.3f ms (%llu chunks, %llu tiles, %llu stairs, %llu spawn points)",
       path.c_str(),
       sourceMilliseconds,
       cacheHit ? "cache hit" : "source load",
@@ -222,7 +232,8 @@ void LoadMapFromPath(flecs::world &world, const std::string &path) {
       materializationMilliseconds,
       chunkCount,
       tileCount,
-      stairCount);
+      stairCount,
+      spawnPointCount);
 }
 
 } // namespace MapManager::Internal

@@ -137,10 +137,6 @@ void BuildLayerChunks(const tmx::Map &tilemap, const tmx::TileLayer &layer, int 
 }
 
 void BuildObjectChunks(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGroup, int layerIndex, Tilemap::LoadedMap &loadedMap) {
-  if (!loadedMap.textureBank) {
-    return;
-  }
-
   const auto &textureBank = loadedMap.textureBank;
   const float layerFloor = GetFloorProperty(objectGroup.getProperties());
 
@@ -152,7 +148,15 @@ void BuildObjectChunks(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGr
     const std::uint32_t gid = object.getTileID() & TMX_FLIP_BITS_REMOVAL;
     if (gid == 0) {
       const auto className = object.getClass();
-      if (className == "Stairs") {
+      if (className == "Spawn") {
+        const auto &name = object.getName();
+        if (name.empty()) {
+          TraceLog(LOG_WARNING, "Ignored unnamed Spawn object in tilemap");
+        } else {
+          const auto position = object.getPosition();
+          loadedMap.spawnPoints.push_back({name, Vector2{position.x, position.y}});
+        }
+      } else if (className == "Stairs") {
         Stairs::StairData stairData;
 
         const auto aabb = object.getAABB();
@@ -180,6 +184,10 @@ void BuildObjectChunks(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGr
         }
         loadedMap.stairs.push_back(stairData);
       }
+      continue;
+    }
+
+    if (!textureBank) {
       continue;
     }
 

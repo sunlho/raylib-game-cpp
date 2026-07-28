@@ -29,7 +29,7 @@ module::module(flecs::world &world) {
 
 void SetMapPath(flecs::world &world, const std::string &path) {
   auto mapEntity = world.entity("Map");
-  mapEntity.set<Internal::MapPath>(Internal::MapPath{path});
+  mapEntity.set<Internal::MapPath>(Internal::MapPath{path, false});
 }
 
 void ProcessPendingMapLoad(flecs::world &world) {
@@ -51,8 +51,15 @@ void ProcessPendingMapLoad(flecs::world &world) {
     return;
   }
 
-  // No-op when the requested map is already the loaded one.
-  Internal::LoadMapFromPath(world, mapPath->value);
+  const std::string requestedPath = mapPath->value;
+  const bool forceReload = mapPath->forceReload;
+  Internal::LoadMapFromPath(world, requestedPath, forceReload);
+
+  // A forced reload is a one-shot request. Clearing it after the attempt also
+  // prevents a malformed TMX file from being reparsed and logged every frame.
+  if (forceReload) {
+    mapEntity.set<Internal::MapPath>(Internal::MapPath{requestedPath, false});
+  }
 }
 
 bool TransitionToMap(flecs::world &world, std::string path, std::string hint) {
@@ -61,6 +68,80 @@ bool TransitionToMap(flecs::world &world, std::string path, std::string hint) {
       {{1.0f, hint, [path = std::move(path)](flecs::world &loadingWorld) {
           SetMapPath(loadingWorld, path);
         }}});
+}
+
+bool ReloadCurrentMap(flecs::world &world, std::string hint) {
+  const std::string currentPath = GetCurrentMapPath(world);
+  if (currentPath.empty()) {
+    return false;
+  }
+
+  return Rendering::RunLoadingSequence(
+      world,
+      {{1.0f, hint, [path = currentPath](flecs::world &loadingWorld) {
+          auto mapEntity = loadingWorld.entity("Map");
+          mapEntity.set<Internal::MapPath>(Internal::MapPath{path, true});
+        }}});
+}
+
+std::string GetCurrentMapPath(const flecs::world &world) {
+  return world.get<Internal::MapState>().currentPath;
+}
+
+bool FindSpawnPoint(const flecs::world &world, std::string_view name, Vector2 &position) {
+  const auto &spawnPoints = world.get<Internal::ActiveMapData>().spawnPoints;
+  for (const auto &spawnPoint : spawnPoints) {
+    if (spawnPoint.name == name) {
+      position = spawnPoint.position;
+      return true;
+    }
+  }
+  return false;
+}
+
+std::vector<std::string> GetSpawnPointNames(const flecs::world &world) {
+  const auto &spawnPoints = world.get<Internal::ActiveMapData>().spawnPoints;
+  std::vector<std::string> names;
+  names.reserve(spawnPoints.size());
+  for (const auto &spawnPoint : spawnPoints) {
+    names.push_back(spawnPoint.name);
+  }
+  return names;
+}
+
+bool FindSpawnPoint(
+    flecs::world &world,
+    const std::string &mapPath,
+    std::string_view name,
+    Vector2 &position) {
+  auto &cacheState = world.get_mut<Internal::MapCacheState>();
+  const auto *loadedMap = Internal::GetOrLoadMap(cacheState, mapPath);
+  if (loadedMap == nullptr) {
+    return false;
+  }
+
+  for (const auto &spawnPoint : loadedMap->spawnPoints) {
+    if (spawnPoint.name == name) {
+      position = spawnPoint.position;
+      return true;
+    }
+  }
+  return false;
+}
+
+std::vector<std::string> GetSpawnPointNames(flecs::world &world, const std::string &mapPath) {
+  auto &cacheState = world.get_mut<Internal::MapCacheState>();
+  const auto *loadedMap = Internal::GetOrLoadMap(cacheState, mapPath);
+  if (loadedMap == nullptr) {
+    return {};
+  }
+
+  std::vector<std::string> names;
+  names.reserve(loadedMap->spawnPoints.size());
+  for (const auto &spawnPoint : loadedMap->spawnPoints) {
+    names.push_back(spawnPoint.name);
+  }
+  return names;
 }
 
 } // namespace MapManager

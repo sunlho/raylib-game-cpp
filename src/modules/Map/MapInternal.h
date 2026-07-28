@@ -17,9 +17,11 @@
 namespace MapManager::Internal {
 
 // The requested map. MapState::currentPath is the loaded one; the two differing
-// IS the pending request, so no separate dirty flag can go out of sync.
+// IS a pending map switch. forceReload makes the same path pending once so a
+// debug reload can bypass both the current-map shortcut and the parsed TMX cache.
 struct MapPath {
   std::string value;
+  bool forceReload = false;
 };
 
 struct MapState {
@@ -46,6 +48,7 @@ struct ActiveMapData {
   std::shared_ptr<Tilemap::TilemapTextureBank> textureBank;
   std::unordered_map<ChunkKey, std::vector<Tilemap::ChunkTile>, ChunkKeyHash> staticTiles;
   std::unordered_map<ChunkKey, std::vector<Rendering::RenderComponent>, ChunkKeyHash> sortableTiles;
+  std::vector<Tilemap::SpawnPoint> spawnPoints;
   int tileWidth = 0;
   int tileHeight = 0;
   int chunkPixelWidth = 0;
@@ -77,7 +80,7 @@ private:
   std::shared_ptr<const Tilemap::TilemapTextureBank> textureBank;
 };
 
-void LoadMapFromPath(flecs::world &world, const std::string &path);
+void LoadMapFromPath(flecs::world &world, const std::string &path, bool forceReload = false);
 void RegisterMapRendering(flecs::world &world);
 
 } // namespace MapManager::Internal

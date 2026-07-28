@@ -1,13 +1,18 @@
 
+#include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
+#include <filesystem>
 #include <iomanip>
 #include <sstream>
 #include <utility>
 
 #include "raylib.h"
 
+#include "../Assets.h"
 #include "../Camera.h"
+#include "../Map/Map.h"
 #include "../Movement.h"
 #include "../Physics.h"
 #include "../Rendering.h"
@@ -35,6 +40,79 @@ std::string JoinArguments(const std::vector<std::string> &arguments) {
     output << arguments[index];
   }
   return output.str();
+}
+
+bool ResolveMapPath(const std::string &argument, std::string &relativePath, std::string &error) {
+  std::filesystem::path path{argument};
+  if (path.empty() || path.is_absolute()) {
+    error = "Usage: map <map.tmx> [spawn]";
+    return false;
+  }
+
+  if (!path.has_extension()) {
+    path += ".tmx";
+  }
+  path = path.lexically_normal();
+
+  for (const auto &part : path) {
+    if (part == "..") {
+      error = "Map path must stay inside the assets directory";
+      return false;
+    }
+  }
+
+  std::string extension = path.extension().string();
+  std::transform(extension.begin(), extension.end(), extension.begin(), [](unsigned char character) {
+    return static_cast<char>(std::tolower(character));
+  });
+  if (extension != ".tmx") {
+    error = "Map must be a .tmx file: " + path.generic_string();
+    return false;
+  }
+
+  relativePath = path.generic_string();
+  if (!Assets::Exists(relativePath)) {
+    error = "Map not found in assets: " + relativePath;
+    return false;
+  }
+  return true;
+}
+
+std::string DescribeSpawnPointError(const flecs::world &world, const std::string &name) {
+  const std::string mapPath = MapManager::GetCurrentMapPath(world);
+  const auto availableNames = MapManager::GetSpawnPointNames(world);
+  std::string message = "Spawn point not found on current map";
+  if (!mapPath.empty()) {
+    message += " (" + mapPath + ")";
+  }
+  message += ": " + name;
+  if (availableNames.empty()) {
+    message += "\nNo Spawn objects with names are defined on this map.";
+    return message;
+  }
+
+  message += "\nAvailable spawn points:";
+  for (const auto &availableName : availableNames) {
+    message += " " + availableName;
+  }
+  return message;
+}
+
+std::string DescribeMapSpawnPointError(
+    const std::string &mapPath,
+    const std::string &name,
+    const std::vector<std::string> &availableNames) {
+  std::string message = "Spawn point not found on map (" + mapPath + "): " + name;
+  if (availableNames.empty()) {
+    message += "\nNo Spawn objects with names are defined on this map.";
+    return message;
+  }
+
+  message += "\nAvailable spawn points:";
+  for (const auto &availableName : availableNames) {
+    message += " " + availableName;
+  }
+  return message;
 }
 
 void TeleportPlayer(flecs::world &world, float x, float y) {
@@ -80,6 +158,140 @@ void TeleportPlayer(flecs::world &world, float x, float y) {
 } // namespace
 
 void RegisterCommands(flecs::world &world, CommandServices services) {
+  RegisterCommand(
+      world,
+      {
+          "map",
+          "[map.tmx] [spawn]",
+          "Show the current map or switch to a TMX map at a named Spawn object",
+          [](flecs::world &commandWorld, const std::vector<std::string> &arguments) {
+            if (arguments.empty()) {
+              const std::string currentPath = MapManager::GetCurrentMapPath(commandWorld);
+              return currentPath.empty()
+                  ? CommandResult{false, "No map is currently loaded"}
+                  : CommandResult{true, "Current map: " + currentPath};
+            }
+            if (arguments.size() > 2) {
+              return CommandResult{false, "Usage: map <map.tmx> [spawn]"};
+            }
+
+            std::string mapPath;
+            std::string error;
+            if (!ResolveMapPath(arguments.front(), mapPath, error)) {
+              return CommandResult{false, std::move(error)};
+            }
+            const auto player = commandWorld.lookup("Player");
+            if (!player.is_valid() || !player.has<Core::Position>()) {
+              return CommandResult{false, "Player is unavailable"};
+            }
+
+            const auto availableSpawnPoints = MapManager::GetSpawnPointNames(commandWorld, mapPath);
+            if (availableSpawnPoints.empty()) {
+              return CommandResult{
+                  false,
+                  "No Spawn objects with names are defined on map: " + mapPath};
+            }
+
+            const std::string spawnName =
+                arguments.size() == 2 ? arguments[1] : availableSpawnPoints.front();
+            Vector2 destination{};
+            if (!MapManager::FindSpawnPoint(commandWorld, mapPath, spawnName, destination)) {
+              return CommandResult{
+                  false,
+                  DescribeMapSpawnPointError(mapPath, spawnName, availableSpawnPoints)};
+            }
+
+            const bool started = Rendering::RunLoadingSequence(
+                commandWorld,
+                {
+                    {0.7f,
+                     "Loading " + mapPath + "...",
+                     [mapPath](flecs::world &loadingWorld) {
+                       MapManager::SetMapPath(loadingWorld, mapPath);
+                     }},
+                    {1.0f,
+                     "Moving to " + spawnName + "...",
+                     [destination](flecs::world &loadingWorld) {
+                       TeleportPlayer(loadingWorld, destination.x, destination.y);
+                     }},
+                });
+            if (!started) {
+              return CommandResult{false, "Another loading sequence is already active"};
+            }
+
+            SetOpen(commandWorld, false);
+            return CommandResult{
+                true,
+                "Switching map to " + mapPath + " at spawn point " + spawnName};
+          },
+      });
+
+  RegisterCommand(
+      world,
+      {
+          "reloadmap",
+          "",
+          "Reload the current TMX map from disk",
+          [](flecs::world &commandWorld, const std::vector<std::string> &arguments) {
+            if (!arguments.empty()) {
+              return CommandResult{false, "Usage: reloadmap"};
+            }
+
+            const std::string currentPath = MapManager::GetCurrentMapPath(commandWorld);
+            if (currentPath.empty()) {
+              return CommandResult{false, "No map is currently loaded"};
+            }
+            if (!MapManager::ReloadCurrentMap(commandWorld, "Reloading " + currentPath + "...")) {
+              return CommandResult{false, "Another loading sequence is already active"};
+            }
+
+            SetOpen(commandWorld, false);
+            return CommandResult{true, "Reloading current map: " + currentPath};
+          },
+      });
+
+  RegisterCommand(
+      world,
+      {
+          "spawn",
+          "<name>",
+          "Teleport the player to a named Spawn object on the current map",
+          [](flecs::world &commandWorld, const std::vector<std::string> &arguments) {
+            if (arguments.size() != 1) {
+              return CommandResult{false, "Usage: spawn <name>"};
+            }
+
+            Vector2 destination{};
+            if (!MapManager::FindSpawnPoint(commandWorld, arguments.front(), destination)) {
+              return CommandResult{false, DescribeSpawnPointError(commandWorld, arguments.front())};
+            }
+
+            const auto player = commandWorld.lookup("Player");
+            if (!player.is_valid() || !player.has<Core::Position>()) {
+              return CommandResult{false, "Player is unavailable"};
+            }
+
+            const std::string spawnName = arguments.front();
+            const bool started = Rendering::RunLoadingSequence(
+                commandWorld,
+                {{1.0f,
+                  "Moving to " + spawnName + "...",
+                  [destination](flecs::world &loadingWorld) {
+                    TeleportPlayer(loadingWorld, destination.x, destination.y);
+                  }}});
+            if (!started) {
+              return CommandResult{false, "Another loading sequence is already active"};
+            }
+
+            SetOpen(commandWorld, false);
+            std::ostringstream output;
+            output << std::fixed << std::setprecision(1)
+                   << "Moving to spawn point " << spawnName << " at "
+                   << destination.x << ", " << destination.y;
+            return CommandResult{true, output.str()};
+          },
+      });
+
   RegisterCommand(
       world,
       {
