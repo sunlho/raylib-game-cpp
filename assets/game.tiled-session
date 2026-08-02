@@ -1,5 +1,5 @@
 {
-    "activeFile": "Map2.tmx",
+    "activeFile": "Map.tmx",
     "expandedProjectPaths": [
     ],
     "file.lastUsedOpenFilter": "全部文件 (*)",
@@ -11,20 +11,20 @@
             "scale": 4,
             "selectedLayer": 5,
             "viewCenter": {
-                "x": 1190,
-                "y": 839.875
+                "x": 1113.875,
+                "y": 840.625
             }
         },
         "Map2.tmx": {
             "expandedObjectLayers": [
-                7,
-                12
+                12,
+                7
             ],
-            "scale": 2,
-            "selectedLayer": 3,
+            "scale": 0.5,
+            "selectedLayer": 2,
             "viewCenter": {
-                "x": 471,
-                "y": 362.25
+                "x": 148,
+                "y": 317
             }
         },
         "Tiles/water.tsx": {
@@ -34,12 +34,12 @@
         },
         "glass.tsx": {
             "dynamicWrapping": false,
-            "scaleInDock": 1.5,
+            "scaleInDock": 4,
             "scaleInEditor": 1
         },
         "object.tsx": {
             "dynamicWrapping": true,
-            "scaleInDock": 1,
+            "scaleInDock": 1.5,
             "scaleInEditor": 1
         }
     },
@@ -48,15 +48,14 @@
     "map.tileHeight": 24,
     "map.tileWidth": 34,
     "openFiles": [
-        "Map.tmx",
-        "Map2.tmx"
+        "Map.tmx"
     ],
     "project": "game.tiled-project",
     "recentFiles": [
         "Map.tmx",
+        "glass.tsx",
         "Map2.tmx",
         "object.tsx",
-        "Tiles/water.tsx",
-        "glass.tsx"
+        "Tiles/water.tsx"
     ]
 }
