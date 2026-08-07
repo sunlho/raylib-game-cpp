@@ -50,6 +50,14 @@ bool TryGetNumberProperty(const tmx::Property &prop, const char *name, float &va
   return false;
 }
 
+std::optional<Tilemap::SpawnDirection> ParseSpawnDirection(const std::string &value) {
+  if (value == "down") return Tilemap::SpawnDirection::Down;
+  if (value == "up") return Tilemap::SpawnDirection::Up;
+  if (value == "left") return Tilemap::SpawnDirection::Left;
+  if (value == "right") return Tilemap::SpawnDirection::Right;
+  return std::nullopt;
+}
+
 void BuildLayerChunks(const tmx::Map &tilemap, const tmx::TileLayer &layer, int layerIndex, Tilemap::LoadedMap &loadedMap) {
   if (!loadedMap.textureBank) {
     return;
@@ -96,6 +104,7 @@ void BuildLayerChunks(const tmx::Map &tilemap, const tmx::TileLayer &layer, int 
 
           const auto tile = textureBank->getTile(gid);
           if (!tile) {
+            loadedMap.validationErrors.push_back("Unknown tile GID: " + std::to_string(gid));
             continue;
           }
 
@@ -152,9 +161,29 @@ void BuildObjectChunks(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGr
         const auto &name = object.getName();
         if (name.empty()) {
           TraceLog(LOG_WARNING, "Ignored unnamed Spawn object in tilemap");
+          loadedMap.validationErrors.push_back("Spawn object must have a non-empty name");
         } else {
           const auto position = object.getPosition();
-          loadedMap.spawnPoints.push_back({name, Vector2{position.x, position.y}});
+          Tilemap::SpawnPoint spawnPoint;
+          spawnPoint.name = name;
+          spawnPoint.position = Vector2{position.x, position.y};
+          for (const auto &prop : object.getProperties()) {
+            if (prop.getName() == "default" && prop.getType() == tmx::Property::Type::Boolean) {
+              spawnPoint.isDefault = prop.getBoolValue();
+              continue;
+            }
+
+            float floor = 0.0f;
+            if (TryGetNumberProperty(prop, "floor", floor)) {
+              spawnPoint.floor = floor;
+              continue;
+            }
+
+            if (prop.getName() == "direction" && prop.getType() == tmx::Property::Type::String) {
+              spawnPoint.direction = ParseSpawnDirection(prop.getStringValue());
+            }
+          }
+          loadedMap.spawnPoints.push_back(std::move(spawnPoint));
         }
       } else if (className == "Stairs") {
         Stairs::StairData stairData;
@@ -193,6 +222,7 @@ void BuildObjectChunks(const tmx::Map &tilemap, const tmx::ObjectGroup &objectGr
 
     const auto tile = textureBank->getTile(gid);
     if (!tile) {
+      loadedMap.validationErrors.push_back("Unknown object tile GID: " + std::to_string(gid));
       continue;
     }
 

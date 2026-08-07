@@ -112,7 +112,7 @@ void BuildChunkEntities(flecs::world &world, const Tilemap::LoadedMap &loadedMap
   }
 }
 
-TexturePreloadStats PreloadMapTextures(Tilemap::LoadedMap &loadedMap) {
+TexturePreloadStats PreloadMapTexturesImpl(Tilemap::LoadedMap &loadedMap, std::string &failedPath) {
   TexturePreloadStats stats;
   if (!loadedMap.textureBank) {
     return stats;
@@ -133,6 +133,9 @@ TexturePreloadStats PreloadMapTextures(Tilemap::LoadedMap &loadedMap) {
     const Texture2D texture = loadedMap.textureBank->getOrLoadTexture(path);
     if (texture.id == 0) {
       ++stats.failed;
+      if (failedPath.empty()) {
+        failedPath = path;
+      }
     } else {
       ++stats.ready;
     }
@@ -151,35 +154,13 @@ std::size_t CountTiles(const Tilemap::LoadedMap &loadedMap) {
 
 } // namespace
 
-void LoadMapFromPath(flecs::world &world, const std::string &path, bool forceReload) {
+bool PreloadMapTextures(Tilemap::LoadedMap &loadedMap, std::string &failedPath) {
+  failedPath.clear();
+  return PreloadMapTexturesImpl(loadedMap, failedPath).failed == 0;
+}
+
+void CommitLoadedMap(flecs::world &world, const Tilemap::LoadedMap &loadedMap, const std::string &path) {
   auto &mapState = world.get_mut<MapState>();
-  if (!forceReload && mapState.currentPath == path && mapState.mapRoot.is_valid()) {
-    return;
-  }
-
-  auto &cacheState = world.get_mut<MapCacheState>();
-  if (forceReload) {
-    const auto cached = cacheState.cache.find(path);
-    if (cached != cacheState.cache.end()) {
-      cacheState.usageOrder.erase(cached->second.lruIt);
-      cacheState.cache.erase(cached);
-    }
-  }
-  const std::size_t hitCountBefore = cacheState.hitCount;
-  const auto sourceStart = Clock::now();
-  auto *loadedMap = GetOrLoadMap(cacheState, path);
-  const auto sourceEnd = Clock::now();
-  const double sourceMilliseconds = ElapsedMilliseconds(sourceStart, sourceEnd);
-  if (!loadedMap) {
-    TraceLog(LOG_WARNING, "Map switch failed for '%s' during source/cache acquisition after %.3f ms", path.c_str(), sourceMilliseconds);
-    return;
-  }
-  const bool cacheHit = cacheState.hitCount > hitCountBefore;
-
-  const auto preloadStart = Clock::now();
-  const TexturePreloadStats preloadStats = PreloadMapTextures(*loadedMap);
-  const auto preloadEnd = Clock::now();
-
   const auto materializationStart = Clock::now();
   DestroyCurrentMap(mapState);
   ClearMapData(world);
@@ -187,48 +168,32 @@ void LoadMapFromPath(flecs::world &world, const std::string &path, bool forceRel
   mapState.mapRoot = world.entity("MapRoot");
   mapState.currentPath = path;
 
-  SpawnStairs(world, *loadedMap, mapState.mapRoot);
+  SpawnStairs(world, loadedMap, mapState.mapRoot);
 
   auto &worldBounds = world.get_mut<Core::WorldBounds>();
-  worldBounds.dimension = loadedMap->dimensions;
+  worldBounds.dimension = loadedMap.dimensions;
   world.modified<Core::WorldBounds>();
 
-  // The camera clamps against WorldBounds, so its smoothed state is stale the
-  // moment the bounds change: leaving it alone makes the camera fly over from
-  // wherever it was on the previous map, and a smaller map leaves it out of
-  // bounds until the damping catches up. No player yet on the very first load --
-  // main() snaps the camera when it spawns one.
-  if (const auto player = world.lookup("Player"); player.is_valid() && player.has<Core::Position>()) {
-    GameCamera::SnapCameraTo(world, player.get<Core::Position>().value);
-  }
-
   auto &activeData = world.get_mut<ActiveMapData>();
-  activeData.textureBank = loadedMap->textureBank;
-  activeData.spawnPoints = loadedMap->spawnPoints;
-  activeData.tileWidth = loadedMap->tileWidth;
-  activeData.tileHeight = loadedMap->tileHeight;
-  activeData.chunkPixelWidth = loadedMap->chunkPixelWidth;
-  activeData.chunkPixelHeight = loadedMap->chunkPixelHeight;
+  activeData.textureBank = loadedMap.textureBank;
+  activeData.spawnPoints = loadedMap.spawnPoints;
+  activeData.tileWidth = loadedMap.tileWidth;
+  activeData.tileHeight = loadedMap.tileHeight;
+  activeData.chunkPixelWidth = loadedMap.chunkPixelWidth;
+  activeData.chunkPixelHeight = loadedMap.chunkPixelHeight;
 
-  BuildChunkEntities(world, *loadedMap, activeData, mapState.mapRoot);
+  BuildChunkEntities(world, loadedMap, activeData, mapState.mapRoot);
   const auto materializationEnd = Clock::now();
 
-  const double preloadMilliseconds = ElapsedMilliseconds(preloadStart, preloadEnd);
   const double materializationMilliseconds = ElapsedMilliseconds(materializationStart, materializationEnd);
-  const auto chunkCount = static_cast<unsigned long long>(loadedMap->chunks.size());
-  const auto tileCount = static_cast<unsigned long long>(CountTiles(*loadedMap));
-  const auto stairCount = static_cast<unsigned long long>(loadedMap->stairs.size());
-  const auto spawnPointCount = static_cast<unsigned long long>(loadedMap->spawnPoints.size());
+  const auto chunkCount = static_cast<unsigned long long>(loadedMap.chunks.size());
+  const auto tileCount = static_cast<unsigned long long>(CountTiles(loadedMap));
+  const auto stairCount = static_cast<unsigned long long>(loadedMap.stairs.size());
+  const auto spawnPointCount = static_cast<unsigned long long>(loadedMap.spawnPoints.size());
   TraceLog(
-      preloadStats.failed == 0 ? LOG_INFO : LOG_WARNING,
-      "Map switch '%s': source/cache=%.3f ms (%s), texture preload=%.3f ms (%llu requested, %llu ready, %llu failed), world materialization=%.3f ms (%llu chunks, %llu tiles, %llu stairs, %llu spawn points)",
+      LOG_INFO,
+      "Map commit '%s': world materialization=%.3f ms (%llu chunks, %llu tiles, %llu stairs, %llu spawn points)",
       path.c_str(),
-      sourceMilliseconds,
-      cacheHit ? "cache hit" : "source load",
-      preloadMilliseconds,
-      static_cast<unsigned long long>(preloadStats.requested),
-      static_cast<unsigned long long>(preloadStats.ready),
-      static_cast<unsigned long long>(preloadStats.failed),
       materializationMilliseconds,
       chunkCount,
       tileCount,

@@ -410,3 +410,6 @@ CMakeUserPresets.json
 .agents/
 AGENTS.md
 .ua
+.codegraph/
+CONTEXT.md
+game.tiled-session

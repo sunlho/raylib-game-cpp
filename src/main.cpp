@@ -82,7 +82,39 @@ static void UpdateLoadingRevealCenter(flecs::world &world) {
   Rendering::SetLoadingRevealCenter(world, GetWorldToScreen2D(worldPos, mainCamera.value));
 }
 
+struct MapStatusPresentation {
+  MapManager::Status pending;
+  bool dirty = false;
+
+  void Capture(const MapManager::Status &status) {
+    pending = status;
+    dirty = true;
+  }
+
+  void Flush(flecs::world &world) {
+    if (!dirty) {
+      return;
+    }
+    dirty = false;
+
+    if (pending.phase == MapManager::Phase::Running) {
+      Rendering::SetLoadingProgress(world, pending.progress, pending.hint);
+      return;
+    }
+    if (pending.phase == MapManager::Phase::Failed && pending.failure) {
+      TraceLog(LOG_ERROR, "Map operation %llu failed: %s", static_cast<unsigned long long>(pending.id), pending.failure->message.c_str());
+      Rendering::SetLoadingProgress(world, 1.0f, "Map failed: " + pending.failure->message);
+      Rendering::BeginLoadingReveal(world);
+      return;
+    }
+    if (pending.phase == MapManager::Phase::Succeeded) {
+      Rendering::BeginLoadingReveal(world);
+    }
+  }
+};
+
 static void RunGame() {
+  MapStatusPresentation mapStatusPresentation;
   flecs::world world;
   world.set<flecs::Rest>({});
   world.import<flecs::stats>();
@@ -97,6 +129,15 @@ static void RunGame() {
   world.import<Character::module>();
   world.import<Stairs::module>();
   world.import<MapManager::module>();
+
+  world.observer<const MapManager::Status>("Present Map Lifecycle")
+      .event(flecs::OnSet)
+      .each([&mapStatusPresentation](const MapManager::Status &status) {
+        // OnSet runs synchronously inside modified<Status>(). Only copy the
+        // event here; mutating other ECS singletons from this callback would
+        // re-enter Flecs while it is publishing the event.
+        mapStatusPresentation.Capture(status);
+      });
 
   GameConsole::RegisterCommands(world, {&isDebugDrawEnabled});
 
@@ -121,27 +162,10 @@ static void RunGame() {
   Debug::FrameStepper frameStepper;
   Debug::ScreenshotCapture screenshotCapture;
   ecs_progress(world, 0);
-  Rendering::RunLoadingSequence(
-      world,
-      {
-          {
-              0.7f,
-              "Loading map...",
-              [](flecs::world &loadingWorld) {
-                MapManager::SetMapPath(loadingWorld, "Map.tmx");
-              },
-          },
-          {
-              1.0f,
-              "Loading character...",
-              [characterUpdate, &accumulator](flecs::world &loadingWorld) {
-                CreatePlayer(loadingWorld);
-                ecs_run_pipeline(loadingWorld, characterUpdate, 0.0f);
-                accumulator = 0.0f;
-              },
-          },
-      },
-      "Preparing resources...");
+  CreatePlayer(world);
+  ecs_run_pipeline(world, characterUpdate, 0.0f);
+  MapManager::Submit(world, MapManager::MapTransition{"Map.tmx"});
+  mapStatusPresentation.Flush(world);
 
   while (!WindowShouldClose()) {
     const bool consoleWasOpen = GameConsole::IsOpen(world);
@@ -160,9 +184,9 @@ static void RunGame() {
 
     const auto frameTime = GetFrameTime();
     screenshotCapture.Update(frameTime);
+    MapManager::AdvanceLifecycle(world);
+    mapStatusPresentation.Flush(world);
     Rendering::UpdateLoadingScreen(world, frameTime);
-
-    MapManager::ProcessPendingMapLoad(world);
 
     const bool loadingScreenVisible = Rendering::IsLoadingScreenVisible(world);
     frameStepper.UpdateControls(!loadingScreenVisible && !consoleIsOpen);

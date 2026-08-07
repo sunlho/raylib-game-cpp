@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -97,9 +98,19 @@ struct TilemapTextureBank {
   ~TilemapTextureBank();
 };
 
+enum class SpawnDirection {
+  Down,
+  Up,
+  Left,
+  Right,
+};
+
 struct SpawnPoint {
   std::string name;
   Vector2 position = {0.0f, 0.0f};
+  bool isDefault = false;
+  std::optional<float> floor;
+  std::optional<SpawnDirection> direction;
 };
 
 struct LoadedMap {
@@ -108,6 +119,7 @@ struct LoadedMap {
   std::vector<Chunk> chunks;
   std::vector<Stairs::StairData> stairs;
   std::vector<SpawnPoint> spawnPoints;
+  std::vector<std::string> validationErrors;
   int tileWidth = 0;
   int tileHeight = 0;
   int chunkPixelWidth = 0;

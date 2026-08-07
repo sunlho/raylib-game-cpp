@@ -16,17 +16,31 @@
 
 namespace MapManager::Internal {
 
-// The requested map. MapState::currentPath is the loaded one; the two differing
-// IS a pending map switch. forceReload makes the same path pending once so a
-// debug reload can bypass both the current-map shortcut and the parsed TMX cache.
-struct MapPath {
-  std::string value;
-  bool forceReload = false;
-};
-
 struct MapState {
   flecs::entity mapRoot = {};
   std::string currentPath;
+};
+
+enum class LifecycleStep {
+  Acquire,
+  Preload,
+  Commit,
+};
+
+struct PreservedPlayerState {
+  Vector2 position = {0.0f, 0.0f};
+  float floor = 0.0f;
+  int direction = 0;
+};
+
+struct LifecycleState {
+  std::optional<Operation> pending;
+  LifecycleStep step = LifecycleStep::Acquire;
+  OperationId nextId = 1;
+  std::string targetPath;
+  SpawnTarget targetSpawn = DefaultSpawn{};
+  Tilemap::LoadedMap *candidate = nullptr;
+  std::optional<PreservedPlayerState> preservedPlayer;
 };
 
 struct ChunkKey {
@@ -80,7 +94,8 @@ private:
   std::shared_ptr<const Tilemap::TilemapTextureBank> textureBank;
 };
 
-void LoadMapFromPath(flecs::world &world, const std::string &path, bool forceReload = false);
+bool PreloadMapTextures(Tilemap::LoadedMap &loadedMap, std::string &failedPath);
+void CommitLoadedMap(flecs::world &world, const Tilemap::LoadedMap &loadedMap, const std::string &path);
 void RegisterMapRendering(flecs::world &world);
 
 } // namespace MapManager::Internal
