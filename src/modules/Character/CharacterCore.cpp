@@ -1,11 +1,10 @@
 #include <algorithm>
-#include <cmath>
-#include <utility>
+
+#include "raylib.h"
 
 #include "CharacterInternal.h"
 
-namespace Character {
-namespace Internal {
+namespace Character::Internal {
 
 const char *DirectionSuffix(CharacterDirection direction) {
   switch (direction) {
@@ -48,15 +47,23 @@ std::string BuildAnimationKey(CharacterState state, CharacterDirection direction
   return key;
 }
 
-AnimationClip *FindClip(AnimationController &controller, std::string_view name) {
-  const auto it = std::find_if(controller.clips.begin(), controller.clips.end(), [name](const AnimationClip &clip) {
-    return clip.name == name;
-  });
-  if (it == controller.clips.end()) {
-    return nullptr;
+std::string BuildCueKey(Presentation::PresentationCue cue, CharacterDirection direction) {
+  const char *prefix = nullptr;
+  switch (cue) {
+  case Presentation::PresentationCue::Interact:
+    prefix = "interact";
+    break;
+  case Presentation::PresentationCue::Hurt:
+    prefix = "hurt";
+    break;
+  case Presentation::PresentationCue::Reset:
+    return {};
   }
 
-  return &(*it);
+  std::string key{prefix};
+  key.push_back('-');
+  key.append(DirectionSuffix(direction));
+  return key;
 }
 
 float RandomDelaySeconds(float minDelay, float maxDelay) {
@@ -68,69 +75,7 @@ float RandomDelaySeconds(float minDelay, float maxDelay) {
     return static_cast<float>(minMs) / 1000.0f;
   }
 
-  const int delayMs = GetRandomValue(minMs, maxMs);
-  return static_cast<float>(delayMs) / 1000.0f;
+  return static_cast<float>(GetRandomValue(minMs, maxMs)) / 1000.0f;
 }
 
-} // namespace Internal
-
-void AnimationController::AddAnimation(AnimationClip clip) {
-  if (clip.frameCount < 1) {
-    clip.frameCount = 1;
-  }
-  if (clip.frameDuration <= 0.0f) {
-    clip.frameDuration = 0.1f;
-  }
-
-  clips.push_back(std::move(clip));
-}
-
-bool AnimationController::PlayAnimation(std::string_view name, bool restart) {
-  const auto it = std::find_if(clips.begin(), clips.end(), [name](const AnimationClip &clip) {
-    return clip.name == name;
-  });
-  if (it == clips.end()) {
-    return false;
-  }
-
-  const int index = static_cast<int>(std::distance(clips.begin(), it));
-  if (currentClip != index || restart) {
-    currentClip = index;
-    currentFrame = 0;
-    elapsed = 0.0f;
-  }
-
-  return true;
-}
-
-const AnimationClip *AnimationController::GetCurrentAnimation() const {
-  if (currentClip < 0 || currentClip >= static_cast<int>(clips.size())) {
-    return nullptr;
-  }
-
-  return &clips[static_cast<std::size_t>(currentClip)];
-}
-
-const SpriteEntry *SpriteSet::FindEntry(std::string_view name) const {
-  const auto it = std::find_if(entries.begin(), entries.end(), [name](const SpriteEntry &entry) {
-    return entry.name == name;
-  });
-  if (it == entries.end()) {
-    return nullptr;
-  }
-
-  return &(*it);
-}
-
-SpriteEntry *SpriteSet::FindEntry(std::string_view name) {
-  const auto it = std::find_if(entries.begin(), entries.end(), [name](const SpriteEntry &entry) {
-    return entry.name == name;
-  });
-  if (it == entries.end()) {
-    return nullptr;
-  }
-
-  return &(*it);
-}
-
-} // namespace Character
+} // namespace Character::Internal

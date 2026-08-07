@@ -171,20 +171,6 @@ Character::CharacterDirection ToCharacterDirection(Tilemap::SpawnDirection direc
   }
 }
 
-const char *IdleAnimation(Character::CharacterDirection direction) {
-  switch (direction) {
-  case Character::CharacterDirection::Up:
-    return "idle-N";
-  case Character::CharacterDirection::Left:
-    return "idle-W";
-  case Character::CharacterDirection::Right:
-    return "idle-E";
-  case Character::CharacterDirection::Down:
-  default:
-    return "idle-S";
-  }
-}
-
 void ApplyPlayerState(
     flecs::world &world,
     Vector2 destination,
@@ -212,16 +198,9 @@ void ApplyPlayerState(
     character->state = Character::CharacterState::Idle;
     character->direction = direction;
   }
-  if (auto *controller = player.try_get_mut<Character::AnimationController>()) {
-    controller->PlayAnimation(IdleAnimation(direction), true);
-  }
+  Character::Presentation::Cue(player, Character::Presentation::PresentationCue::Reset);
   if (auto *renderable = player.try_get_mut<Rendering::RenderComponent>()) {
     renderable->floor = floor;
-    if (const auto *sprites = player.try_get<Character::SpriteSet>()) {
-      if (const auto *controller = player.try_get<Character::AnimationController>()) {
-        renderable->sortY = static_cast<int>(destination.y + Character::GetSpriteHalfExtents(*sprites, *controller).y);
-      }
-    }
   }
 
   GameCamera::SnapCameraTo(world, destination);

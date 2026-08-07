@@ -52,6 +52,7 @@ add_executable(${PROJECT_NAME}
     src/modules/Character/CharacterAnimation.cpp
     src/modules/Character/CharacterCore.cpp
     src/modules/Character/CharacterPhysics.cpp
+    src/modules/Character/CharacterPresentation.cpp
     src/modules/Character/CharacterRendering.cpp
     src/modules/Character/CharacterSprites.cpp
 
@@ -82,3 +83,20 @@ endif()
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     ASSETS_PATH="${ASSETS_PATH}/"
 )
+
+enable_testing()
+
+add_executable(CharacterPresentationTests
+    tests/CharacterPresentationTests.cpp
+    src/modules/Character/CharacterCore.cpp
+    src/modules/Character/CharacterPresentation.cpp
+    src/modules/Character/CharacterRendering.cpp
+    src/modules/Character/CharacterSprites.cpp
+)
+target_include_directories(CharacterPresentationTests PRIVATE src)
+target_link_libraries(CharacterPresentationTests PRIVATE raylib flecs::flecs_static libwebp::libwebp)
+target_compile_definitions(CharacterPresentationTests PRIVATE
+    ASSETS_PATH="${ASSETS_PATH}/"
+)
+
+add_test(NAME CharacterPresentation COMMAND CharacterPresentationTests)

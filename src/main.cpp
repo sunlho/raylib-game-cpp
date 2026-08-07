@@ -1,6 +1,5 @@
 #include <algorithm>
 #include <iostream>
-#include <utility>
 
 #include "flecs.h"
 #include "raylib.h"
@@ -27,9 +26,13 @@ constexpr int STARTUP_PRESET = GameWindow::kDefaultPreset;
 
 static bool isDebugDrawEnabled = false;
 
-static ecs_entity_t CreatePlayer(flecs::world &world) {
-  Character::SpriteSet playerSprites;
-  playerSprites.entries = {
+namespace {
+
+const Character::Presentation::AppearanceId PlayerAppearance{"player-a"};
+
+Character::Presentation::AppearanceIntent BuildPlayerAppearance() {
+  Character::Presentation::AppearanceIntent appearance;
+  appearance.animations = {
       {"idle-N", "player/A_idle-N.webp"},
       {"idle-S", "player/A_idle-S.webp"},
       {"idle-E", "player/A_idle-E.webp"},
@@ -43,21 +46,31 @@ static ecs_entity_t CreatePlayer(flecs::world &world) {
       {"interact-E", "player/A_interact-E.webp", 0.08f, false},
       {"interact-W", "player/A_interact-W.webp", 0.08f, false},
   };
-  playerSprites.scale = 1.0f;
+  appearance.defaultAnimation = "idle-S";
+  appearance.geometry.scale = 1.0f;
+  return appearance;
+}
 
+} // namespace
+
+static ecs_entity_t CreatePlayer(flecs::world &world) {
   const Vector2 playerStart = {700.0f, 700.0f};
   auto player = world.entity("Player");
   player.add<Character::PlayerTag>()
       .add<GameCamera::FollowTarget>()
       .set<Character::CharacterInfo>({"Player", Character::CharacterState::Idle, Character::CharacterDirection::Down})
       .set<Character::CharacterStats>({100.0f, 100.0f, 10.0f, 2.0f})
-      .set<Character::AnimationController>({})
-      .set<Character::IdleBehavior>({})
-      .set<Character::SpriteSet>(std::move(playerSprites))
       .set<Core::Position>({playerStart})
       .set<Core::PreviousPosition>({playerStart})
       .set<Core::RenderPosition>({playerStart, playerStart})
       .set<Stairs::FloorState>({2.5f, 2.5f});
+
+  const auto assigned = Character::Presentation::Assign(player, PlayerAppearance);
+  if (!assigned) {
+    std::cerr << "Failed to assign player appearance: " << assigned.message << '\n';
+    player.destruct();
+    return 0;
+  }
 
   Movement::EnablePlayerMovement(player, {100.0f, 1.6f, 0.2f});
 
@@ -132,6 +145,15 @@ static void RunGame() {
   world.import<Stairs::module>();
   world.import<MapManager::module>();
 
+  const auto appearanceRegistered =
+      Character::Presentation::Register(world, PlayerAppearance, BuildPlayerAppearance());
+  if (!appearanceRegistered) {
+    std::cerr << "Failed to register player appearance: " << appearanceRegistered.message << '\n';
+    Character::Presentation::Shutdown(world);
+    world.quit();
+    return;
+  }
+
   auto followTargetQuery =
       world.query_builder<const Core::RenderPosition>()
           .with<GameCamera::FollowTarget>()
@@ -159,7 +181,11 @@ static void RunGame() {
   Debug::FrameStepper frameStepper;
   Debug::ScreenshotCapture screenshotCapture;
   ecs_progress(world, 0);
-  CreatePlayer(world);
+  if (CreatePlayer(world) == 0) {
+    Character::Presentation::Shutdown(world);
+    world.quit();
+    return;
+  }
   MapManager::Submit(world, MapManager::MapTransition{"Map.tmx"});
   mapStatusPresentation.Flush(world);
 
@@ -260,6 +286,7 @@ static void RunGame() {
     ecs_frame_end(world);
   }
 
+  Character::Presentation::Shutdown(world);
   world.quit();
 }
 

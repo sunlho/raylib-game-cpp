@@ -1,105 +1,50 @@
+#include <cmath>
+#include <utility>
 
 #include "CharacterInternal.h"
 
-#include "modules/Rendering.h"
-
 namespace Character::Internal {
 
-CharacterRenderable::CharacterRenderable(flecs::entity entity) : entity_(entity) {
+CharacterRenderable::CharacterRenderable(
+    flecs::entity entity,
+    std::weak_ptr<CatalogState> catalog)
+    : entity_(entity), catalog_(std::move(catalog)) {
 }
 
 void CharacterRenderable::Draw(const Core::Position &position) const {
-  // Bind by pointer, never by value: get<T>() returns const T&, so `auto` would
-  // deep-copy the whole SpriteSet (every decoded animation frame of every clip)
-  // on every draw call. try_get_mut is required because animation.lastFrame is
-  // the upload cache below and has to survive across frames.
-  auto *spriteSet = entity_.try_get_mut<SpriteSet>();
-  const auto *controller = entity_.try_get<AnimationController>();
-  if (!spriteSet || !controller || !spriteSet->loaded) {
+  const auto catalog = catalog_.lock();
+  if (!catalog || catalog->closed) {
     return;
   }
 
-  const auto *clip = controller->GetCurrentAnimation();
-  if (!clip) {
+  const auto *playback = entity_.try_get<PlaybackState>();
+  if (!playback) {
     return;
   }
 
-  auto *entry = spriteSet->FindEntry(clip->name);
-  if (!entry) {
+  const auto *appearance = FindAppearance(*catalog, playback->appearanceId);
+  const auto *animation = CurrentAnimation(*catalog, *playback);
+  if (!appearance || !animation || animation->loaded.frames.empty()) {
     return;
   }
 
-  auto &animation = entry->animation;
-  if (animation.texture.id == 0 || animation.frameCount <= 0) {
-    return;
-  }
-
-  int frame = controller->currentFrame;
-  if (frame < 0) {
-    frame = 0;
-  }
-  if (frame >= animation.frameCount) {
-    frame = animation.frameCount - 1;
-  }
-
-  if (animation.bytesPerFrame > 0 &&
-      frame != animation.lastFrame &&
-      static_cast<std::size_t>(animation.bytesPerFrame) * (static_cast<std::size_t>(frame) + 1) <= animation.pixels.size()) {
-    UpdateTexture(animation.texture, animation.pixels.data() + static_cast<std::size_t>(animation.bytesPerFrame) * frame);
-
-    animation.lastFrame = frame;
-  }
-
-  Rectangle src = {
-      0.0f,
-      0.0f,
-      static_cast<float>(animation.width),
-      static_cast<float>(animation.height)};
   Vector2 renderPosition = position.value;
-  // Use the camera-relative quantized render position when available.
-  // This replaces the old camera-follow special case and makes all dynamic
-  // entities use the same quantisation rule.
-  const Core::RenderPosition *rp = entity_.try_get<Core::RenderPosition>();
-  if (rp) {
+  if (const auto *rp = entity_.try_get<Core::RenderPosition>()) {
     renderPosition = rp->quantized;
   }
 
-  Rectangle dest = {
+  const auto &geometry = appearance->intent.geometry;
+  Rectangle destination = {
       renderPosition.x,
       renderPosition.y,
-      static_cast<float>(animation.width) * spriteSet->scale,
-      static_cast<float>(animation.height) * spriteSet->scale};
-  // No roundf() here: quantisation was already applied by QuantizeForCamera
-  // in Rendering::PrepareRenderFrame. Double-rounding would break the 0.5-unit grid.
-  Vector2 origin = spriteSet->useCenterOrigin ? Vector2{roundf(dest.width * 0.5f), roundf(dest.height * 0.5f)} : spriteSet->origin;
+      static_cast<float>(animation->loaded.width) * geometry.scale,
+      static_cast<float>(animation->loaded.height) * geometry.scale};
+  const Vector2 origin =
+      geometry.useCenterOrigin
+          ? Vector2{std::round(destination.width * 0.5f), std::round(destination.height * 0.5f)}
+          : Vector2{geometry.originX, geometry.originY};
 
-  DrawTexturePro(animation.texture, src, dest, origin, 0.0f, WHITE);
-}
-
-void RegisterCharacterRendering(flecs::world &world) {
-  world.observer<SpriteSet, const AnimationController, const Core::Position>("Create Character Renderable Observer")
-      .event(flecs::OnSet)
-      .each([](flecs::entity entity, SpriteSet &spriteSet, const AnimationController &controller, const Core::Position &position) {
-        CharacterRenderable renderable(entity);
-        auto renderablePtr = std::make_shared<CharacterRenderable>(entity);
-        Rendering::RenderComponent renderComponent;
-        renderComponent.object = renderablePtr;
-        renderComponent.visible = true;
-
-        const Vector2 halfExtents = GetSpriteHalfExtents(spriteSet, controller);
-
-        renderComponent.sortY = static_cast<int>(position.value.y + halfExtents.y);
-
-        entity.add<Rendering::RenderComponent>().set(renderComponent);
-        entity.add<Rendering::SortableTag>();
-      });
-
-  world.system<const Core::Position, const SpriteSet, const AnimationController, Rendering::RenderComponent>("Update Character Render Sort")
-      .kind<Character::Phases::Update>()
-      .each([](const Core::Position &position, const SpriteSet &spriteSet, const AnimationController &controller, Rendering::RenderComponent &renderComponent) {
-        const Vector2 halfExtents = GetSpriteHalfExtents(spriteSet, controller);
-        renderComponent.sortY = static_cast<int>(position.value.y + halfExtents.y);
-      });
+  catalog->backend->DrawFrame(animation->loaded, playback->frame, destination, origin);
 }
 
 } // namespace Character::Internal

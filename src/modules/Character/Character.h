@@ -1,11 +1,9 @@
 #pragma once
 
 #include <string>
-#include <string_view>
 #include <vector>
 
 #include "flecs.h"
-#include "raylib.h"
 
 namespace Character {
 
@@ -41,68 +39,69 @@ struct CharacterStats {
   float defense = 0.0f;
 };
 
-struct AnimationClip {
-  std::string name;
-  int frameCount = 1;
-  float frameDuration = 0.1f;
-  bool loop = true;
+struct PlayerTag {};
+struct NPCTag {};
+
+namespace Presentation {
+
+struct AppearanceId {
+  std::string value;
 };
 
-struct AnimationController {
-  std::vector<AnimationClip> clips;
-  int currentClip = -1;
-  int currentFrame = 0;
-  float elapsed = 0.0f;
-
-  void AddAnimation(AnimationClip clip);
-  bool PlayAnimation(std::string_view name, bool restart = false);
-  const AnimationClip *GetCurrentAnimation() const;
-};
-
-struct IdleBehavior {
-  float minDelay = 0.5f;
-  float maxDelay = 1.2f;
-  float timer = 0.0f;
-  bool waiting = true;
-  bool playing = false;
-  bool wasMoving = false;
-  bool initialized = false;
-};
-
-struct SpriteAnimation {
-  Texture2D texture = {0};
-  int frameCount = 0;
-  int width = 0;
-  int height = 0;
-  int format = 0;
-  int bytesPerFrame = 0;
-  int lastFrame = -1;
-  std::vector<unsigned char> pixels;
-};
-
-struct SpriteEntry {
+struct AnimationIntent {
   std::string name;
   std::string path;
   float frameDuration = 0.12f;
   bool loop = true;
-  SpriteAnimation animation;
 };
 
-struct SpriteSet {
-  std::vector<SpriteEntry> entries;
+struct AppearanceGeometry {
   float scale = 1.0f;
-  Vector2 origin = {0.0f, 0.0f};
+  float originX = 0.0f;
+  float originY = 0.0f;
   bool useCenterOrigin = true;
-  bool loaded = false;
-
-  const SpriteEntry *FindEntry(std::string_view name) const;
-  SpriteEntry *FindEntry(std::string_view name);
 };
 
-struct PlayerTag {};
-struct NPCTag {};
+struct AppearanceIntent {
+  std::vector<AnimationIntent> animations;
+  std::string defaultAnimation;
+  AppearanceGeometry geometry;
+  float idleDelayMin = 0.5f;
+  float idleDelayMax = 1.2f;
+};
 
-Vector2 GetSpriteHalfExtents(const SpriteSet &spriteSet, const AnimationController &controller);
+enum class PresentationCue {
+  Reset,
+  Interact,
+  Hurt,
+};
+
+enum class ErrorCode {
+  None,
+  Closed,
+  InvalidAppearanceId,
+  DuplicateAppearance,
+  InvalidIntent,
+  AssetLoadFailed,
+  UnknownAppearance,
+  InvalidCharacter,
+  MissingCharacterData,
+  RenderableConflict,
+};
+
+struct Result {
+  ErrorCode code = ErrorCode::None;
+  std::string message;
+
+  explicit operator bool() const { return code == ErrorCode::None; }
+};
+
+Result Register(flecs::world &world, AppearanceId id, AppearanceIntent intent);
+Result Assign(flecs::entity character, const AppearanceId &id);
+void Cue(flecs::entity character, PresentationCue cue);
+void Shutdown(flecs::world &world);
+
+} // namespace Presentation
 
 struct module {
   module(flecs::world &world);
