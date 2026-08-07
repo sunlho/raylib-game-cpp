@@ -7,6 +7,8 @@
 
 namespace GameCamera {
 
+struct FollowTarget {};
+
 struct MainCamera {
   Camera2D value = {
       Vector2{0.0f, 0.0f}, // offset  set in Begin2D to scene-target centre
@@ -49,10 +51,12 @@ struct MainCamera {
 void Begin2D(flecs::world &world);
 void End2D(const flecs::world &world);
 
-// Per-render-frame camera update.
-//   interpolatedPlayerPos  RenderPosition::interpolated of the follow target.
-//   dt                     real frame delta time (NOT fixedTimeStep).
-void UpdateRenderCamera(flecs::world &world, Vector2 interpolatedPlayerPos, float dt);
+// Per-render-frame camera update using the interpolated position of the entity
+// tagged with FollowTarget. No-op when no target exists.
+void UpdateRenderCamera(
+    flecs::world &world,
+    flecs::query<const Core::RenderPosition> &followTargetQuery,
+    float dt);
 
 // Instantly reposition smoothTarget and renderTarget to focus. Call on
 // teleport / map change / spawn to prevent long fly-overs.

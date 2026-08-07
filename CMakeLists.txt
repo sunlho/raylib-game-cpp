@@ -32,9 +32,11 @@ add_executable(${PROJECT_NAME}
     src/main.cpp
     src/modules/Camera.cpp
     src/modules/Core/Core.cpp
+    src/modules/Core/Simulation.cpp
     src/modules/Console/Console.cpp
     src/modules/Console/ConsoleUI.cpp
     src/modules/Console/Register.cpp
+    src/modules/Input.cpp
     src/modules/Movement.cpp
     src/modules/Rendering.cpp
     src/modules/Physics.cpp

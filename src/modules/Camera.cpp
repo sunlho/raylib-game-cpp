@@ -51,7 +51,7 @@ void End2D(const flecs::world &world) {
   }
 }
 
-void UpdateRenderCamera(flecs::world &world, Vector2 interpolatedPlayerPos, float dt) {
+void UpdateRenderCameraTo(flecs::world &world, Vector2 interpolatedPlayerPos, float dt) {
   auto &camera = world.get_mut<MainCamera>();
   const Vector2 viewSize = world.get<Core::LogicalViewSize>().value;
   const Vector2 worldSize = world.get<Core::WorldBounds>().dimension;
@@ -103,6 +103,21 @@ void UpdateRenderCamera(flecs::world &world, Vector2 interpolatedPlayerPos, floa
   camera.value.target = camera.renderTarget;
 }
 
+void UpdateRenderCamera(flecs::world &world, flecs::query<const Core::RenderPosition> &query, float dt) {
+  Vector2 target = {};
+  bool found = false;
+  query.each([&](const Core::RenderPosition &position) {
+    if (!found) {
+      target = position.interpolated;
+      found = true;
+    }
+  });
+
+  if (found) {
+    UpdateRenderCameraTo(world, target, dt);
+  }
+}
+
 void SnapCameraTo(flecs::world &world, Vector2 focus) {
   auto &camera = world.get_mut<MainCamera>();
   const Vector2 viewSize = world.get<Core::LogicalViewSize>().value;
@@ -117,6 +132,7 @@ void SnapCameraTo(flecs::world &world, Vector2 focus) {
 }
 
 module::module(flecs::world &world) {
+  world.component<FollowTarget>();
   Reflection::Register<Camera2D>(world);
   Reflection::Register<MainCamera>(world)
       .add(flecs::Singleton)

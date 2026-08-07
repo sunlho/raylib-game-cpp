@@ -11,7 +11,8 @@ namespace Simulation {
 // modules genuinely need a specific order, they now declare different phases:
 // the phase IS the ordering contract, and it is checked by the compiler.
 
-struct PrePhysics {};  // write gameplay intent into the physics world
+struct ResolveMovement {}; // convert the latest control intent into requested velocity
+struct PrePhysics {};      // write gameplay intent into the physics world
 struct PhysicsStep {}; // advance box2d
 
 // Physics results are read back into Position here...
@@ -20,9 +21,13 @@ struct PostPhysics {};
 // the synced positions).
 struct PostPhysicsEvents {};
 
-// Gameplay that owns Position, e.g. clamping the player inside the world...
+// Gameplay that consumes the synced physics result...
 struct FixedUpdate {};
 // ...and gameplay that must observe the final Position of this tick.
 struct FixedUpdateLate {};
+
+// Runs one complete fixed simulation transaction. Systems still register into
+// the phases above; callers do not need to know or reproduce their ordering.
+void RunFixedTick(flecs::world &world, float deltaTime);
 
 } // namespace Simulation

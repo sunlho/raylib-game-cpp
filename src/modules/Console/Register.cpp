@@ -47,8 +47,8 @@ void TeleportPlayer(flecs::world &world, float x, float y) {
 
   const Vector2 destination{x, y};
   player.get_mut<Core::Position>().value = destination;
-  if (player.has<Movement::Velocity>()) {
-    player.get_mut<Movement::Velocity>().value = Vector2{0.0f, 0.0f};
+  if (player.has<Movement::RequestedVelocity>()) {
+    player.get_mut<Movement::RequestedVelocity>().value = Vector2{0.0f, 0.0f};
   }
   if (player.has<Physics::PhysicsBody>()) {
     Physics::Relocate(player.get<Physics::PhysicsBody>(), destination, true);
@@ -95,15 +95,16 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
                 return CommandResult{false, status.failure->message};
               }
               return status.currentMapPath.empty()
-                  ? CommandResult{false, "No map is currently loaded"}
-                  : CommandResult{true, "Current map: " + status.currentMapPath};
+                         ? CommandResult{false, "No map is currently loaded"}
+                         : CommandResult{true, "Current map: " + status.currentMapPath};
             }
             if (arguments.size() > 2) {
               return CommandResult{false, "Usage: map <map.tmx> [spawn]"};
             }
 
             MapManager::MapTransition transition{arguments.front()};
-            if (arguments.size() == 2) transition.destination = MapManager::NamedSpawn{arguments[1]};
+            if (arguments.size() == 2)
+              transition.destination = MapManager::NamedSpawn{arguments[1]};
             const auto receipt = MapManager::Submit(commandWorld, std::move(transition));
             if (receipt.admission == MapManager::Admission::Busy)
               return CommandResult{false, "Another map operation is already active"};
@@ -308,11 +309,12 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
               const auto &camera = w.get<GameCamera::MainCamera>();
               std::ostringstream text;
               text << std::fixed << std::setprecision(0);
-              text << "Scene resolution: " << Rendering::ToString(Rendering::GetSceneResolution(w))
-                   << " (" << size.x << "x" << size.y
-                   << ", zoom " << camera.value.zoom
-                   << ", grid " << (camera.pixelsPerWorldUnit > 0.0f ? 1.0f / camera.pixelsPerWorldUnit : 0.0f)
-                   << " world unit)";
+              text
+                  << "Scene resolution: " << Rendering::ToString(Rendering::GetSceneResolution(w))
+                  << " (" << size.x << "x" << size.y
+                  << ", zoom " << camera.value.zoom
+                  << ", grid " << (camera.pixelsPerWorldUnit > 0.0f ? 1.0f / camera.pixelsPerWorldUnit : 0.0f)
+                  << " world unit)";
               return text.str();
             };
 
@@ -388,24 +390,25 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
 
             std::ostringstream report;
             report << std::fixed << std::setprecision(2);
-            report << "Window:       " << GetScreenWidth() << "x" << GetScreenHeight()
-                   << (GameWindow::IsFullscreen() ? " (fullscreen)" : "")
-                   << "\nScene buffer: " << sceneSize.x << "x" << sceneSize.y
-                   << " (" << Rendering::ToString(Rendering::GetSceneResolution(commandWorld)) << ")"
-                   << "\nLogical view: " << logicalView.x << "x" << logicalView.y << " world units"
-                   << "\nCamera zoom:  " << mainCamera.value.zoom
-                   << "\nPPWU:         " << mainCamera.pixelsPerWorldUnit
-                   << "\nScale mode:   " << Rendering::ToString(mode)
-                   << "\nOutput rect:  " << output.width << "x" << output.height
-                   << " at " << output.x << "," << output.y
-                   << " (" << (output.height / sceneSize.y) << "x)"
-                   << "\nCamera grid:  " << (mainCamera.pixelsPerWorldUnit > 0.0f ? 1.0f / mainCamera.pixelsPerWorldUnit : 0.0f)
-                   << " world unit, effective "
-                   << ((mainCamera.pixelsPerWorldUnit > 0.0f && output.height > 0.0f)
-                           ? 1.0f / (mainCamera.pixelsPerWorldUnit * std::max(1.0f, std::round(output.height / sceneSize.y)))
-                           : 0.0f)
-                   << " with residual shift"
-                   << "\nRender shift: " << mainCamera.renderShift.x << "," << mainCamera.renderShift.y << " output px";
+            report
+                << "Window:       " << GetScreenWidth() << "x" << GetScreenHeight()
+                << (GameWindow::IsFullscreen() ? " (fullscreen)" : "")
+                << "\nScene buffer: " << sceneSize.x << "x" << sceneSize.y
+                << " (" << Rendering::ToString(Rendering::GetSceneResolution(commandWorld)) << ")"
+                << "\nLogical view: " << logicalView.x << "x" << logicalView.y << " world units"
+                << "\nCamera zoom:  " << mainCamera.value.zoom
+                << "\nPPWU:         " << mainCamera.pixelsPerWorldUnit
+                << "\nScale mode:   " << Rendering::ToString(mode)
+                << "\nOutput rect:  " << output.width << "x" << output.height
+                << " at " << output.x << "," << output.y
+                << " (" << (output.height / sceneSize.y) << "x)"
+                << "\nCamera grid:  " << (mainCamera.pixelsPerWorldUnit > 0.0f ? 1.0f / mainCamera.pixelsPerWorldUnit : 0.0f)
+                << " world unit, effective "
+                << ((mainCamera.pixelsPerWorldUnit > 0.0f && output.height > 0.0f)
+                        ? 1.0f / (mainCamera.pixelsPerWorldUnit * std::max(1.0f, std::round(output.height / sceneSize.y)))
+                        : 0.0f)
+                << " with residual shift"
+                << "\nRender shift: " << mainCamera.renderShift.x << "," << mainCamera.renderShift.y << " output px";
             return CommandResult{true, report.str()};
           },
       });
@@ -443,17 +446,17 @@ void RegisterCommands(flecs::world &world, CommandServices services) {
           "Show or set player movement speed",
           [](flecs::world &commandWorld, const std::vector<std::string> &arguments) {
             const auto player = commandWorld.lookup("Player");
-            if (!player.is_valid() || !player.has<Movement::MoveSpeed>()) {
+            if (!player.is_valid() || !player.has<Movement::PlayerMovementSettings>()) {
               return CommandResult{false, "Player is unavailable"};
             }
             if (arguments.empty()) {
-              return CommandResult{true, "Player speed: " + std::to_string(player.get<Movement::MoveSpeed>().value)};
+              return CommandResult{true, "Player speed: " + std::to_string(player.get<Movement::PlayerMovementSettings>().walkSpeed)};
             }
             float speed = 0.0f;
             if (!ParseFloat(arguments.front(), speed) || speed < 0.0f || speed > 1000.0f) {
               return CommandResult{false, "Usage: speed [0-1000]"};
             }
-            player.get_mut<Movement::MoveSpeed>().value = speed;
+            player.get_mut<Movement::PlayerMovementSettings>().walkSpeed = speed;
             return CommandResult{true, "Player speed set to " + std::to_string(speed)};
           },
       });

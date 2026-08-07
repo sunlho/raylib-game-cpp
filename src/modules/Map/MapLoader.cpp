@@ -1,3 +1,4 @@
+#include <array>
 #include <chrono>
 #include <format>
 #include <memory>
@@ -10,6 +11,7 @@
 #include "MapInternal.h"
 
 #include "modules/Camera.h"
+#include "modules/Physics.h"
 #include "modules/Stairs/Stairs.h"
 #include "modules/Tilemap/Tilemap.h"
 
@@ -58,6 +60,25 @@ void SpawnStairs(flecs::world &world, const Tilemap::LoadedMap &loadedMap, flecs
     auto stairEntity = mapRoot.is_valid() ? world.entity(flecs::Parent{mapRoot}, stairName.c_str()) : world.entity(stairName.c_str());
 
     stairEntity.set<Stairs::StairData>(loadedMap.stairs[stairIndex]);
+  }
+}
+
+void SpawnWorldBoundary(flecs::world &world, Vector2 dimensions, flecs::entity mapRoot) {
+  if (dimensions.x <= 0.0f || dimensions.y <= 0.0f) {
+    return;
+  }
+
+  constexpr float Thickness = 64.0f;
+  const std::array<Rectangle, 4> walls = {
+      Rectangle{0.0f, -Thickness, dimensions.x, Thickness},
+      Rectangle{0.0f, dimensions.y, dimensions.x, Thickness},
+      Rectangle{-Thickness, 0.0f, Thickness, dimensions.y},
+      Rectangle{dimensions.x, 0.0f, Thickness, dimensions.y}};
+
+  for (std::size_t index = 0; index < walls.size(); ++index) {
+    const std::string name = std::format("MapBoundary_{}", index);
+    auto entity = world.entity(flecs::Parent{mapRoot}, name.c_str());
+    Physics::CreateStaticCollision(entity, Physics::StaticCollisionShape::Box, walls[index]);
   }
 }
 
@@ -173,6 +194,8 @@ void CommitLoadedMap(flecs::world &world, const Tilemap::LoadedMap &loadedMap, c
   auto &worldBounds = world.get_mut<Core::WorldBounds>();
   worldBounds.dimension = loadedMap.dimensions;
   world.modified<Core::WorldBounds>();
+
+  SpawnWorldBoundary(world, loadedMap.dimensions, mapState.mapRoot);
 
   auto &activeData = world.get_mut<ActiveMapData>();
   activeData.textureBank = loadedMap.textureBank;

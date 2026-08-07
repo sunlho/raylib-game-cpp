@@ -126,8 +126,10 @@ bool ValidateMap(const Tilemap::LoadedMap &map, Failure &failure) {
     if (spawn.name.empty() || !names.insert(spawn.name).second ||
         !spawn.floor.has_value() || !std::isfinite(*spawn.floor) ||
         !spawn.direction.has_value() || !IsInsideMap(spawn.position, map.dimensions)) {
-      failure = {FailureCode::InvalidSpawnSet,
-                 "Spawn names must be unique and every spawn must declare a valid position, floor and direction"};
+      failure = {
+          FailureCode::InvalidSpawnSet,
+          "Spawn names must be unique and every spawn must declare a valid position, floor and direction",
+      };
       return false;
     }
     if (spawn.isDefault)
@@ -190,8 +192,8 @@ void ApplyPlayerState(
     Character::CharacterDirection direction) {
   const auto player = world.lookup("Player");
   player.get_mut<Core::Position>().value = destination;
-  if (player.has<Movement::Velocity>())
-    player.get_mut<Movement::Velocity>().value = Vector2{};
+  if (player.has<Movement::RequestedVelocity>())
+    player.get_mut<Movement::RequestedVelocity>().value = Vector2{};
   if (const auto *body = player.try_get<Physics::PhysicsBody>()) {
     Physics::Relocate(*body, destination, true);
     const float yOffset = (floor - 1.5f) * 10.0f;

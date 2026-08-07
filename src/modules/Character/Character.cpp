@@ -1,8 +1,6 @@
 #include "CharacterInternal.h"
 
-#include "modules/Movement.h"
 #include "modules/Reflection.h"
-#include "modules/Rendering.h"
 
 namespace Character {
 

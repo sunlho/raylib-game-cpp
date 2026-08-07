@@ -5,30 +5,19 @@
 
 namespace Movement {
 
-struct Phases {
-  struct Update {};
-};
-
-struct Velocity {
+struct RequestedVelocity {
   Vector2 value = {0.0f, 0.0f};
 };
 
-struct MoveSpeed {
-  float value;
+struct PlayerMovementSettings {
+  float walkSpeed = 100.0f;
+  float runSpeedMultiplier = 1.6f;
+  float runAccelerationTime = 0.2f;
 };
 
-struct RunSettings {
-  float speedMultiplier = 1.6f;
-  float accelerationTime = 0.2f;
-};
-
-struct RunState {
-  bool active = false;
-  float progress = 0.0f;
-};
-
-struct PlayerControlled {};
-struct CameraFollowTag {};
+void EnablePlayerMovement(
+    flecs::entity player,
+    PlayerMovementSettings settings = {});
 
 struct module {
   module(flecs::world &world);

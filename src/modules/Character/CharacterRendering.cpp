@@ -1,8 +1,6 @@
 
 #include "CharacterInternal.h"
 
-#include "modules/Camera.h"
-#include "modules/Movement.h"
 #include "modules/Rendering.h"
 
 namespace Character::Internal {
@@ -90,10 +88,17 @@ void RegisterCharacterRendering(flecs::world &world) {
 
         const Vector2 halfExtents = GetSpriteHalfExtents(spriteSet, controller);
 
-        renderComponent.sortY = position.value.y + halfExtents.y;
+        renderComponent.sortY = static_cast<int>(position.value.y + halfExtents.y);
 
         entity.add<Rendering::RenderComponent>().set(renderComponent);
         entity.add<Rendering::SortableTag>();
+      });
+
+  world.system<const Core::Position, const SpriteSet, const AnimationController, Rendering::RenderComponent>("Update Character Render Sort")
+      .kind<Character::Phases::Update>()
+      .each([](const Core::Position &position, const SpriteSet &spriteSet, const AnimationController &controller, Rendering::RenderComponent &renderComponent) {
+        const Vector2 halfExtents = GetSpriteHalfExtents(spriteSet, controller);
+        renderComponent.sortY = static_cast<int>(position.value.y + halfExtents.y);
       });
 }
 

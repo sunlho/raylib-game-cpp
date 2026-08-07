@@ -211,9 +211,9 @@ module::module(flecs::world &world) {
   worldDef.gravity = b2Vec2{0.0f, 0.0f};
   world.set<PhysicsWorld>({b2CreateWorld(&worldDef), {}});
 
-  world.system<const Movement::Velocity, const PhysicsBody>("Apply Entity Velocity")
+  world.system<const Movement::RequestedVelocity, const PhysicsBody>("Apply Entity Velocity")
       .kind<Simulation::PrePhysics>()
-      .each([](const Movement::Velocity &velocity, const PhysicsBody &body) {
+      .each([](const Movement::RequestedVelocity &velocity, const PhysicsBody &body) {
         const b2BodyId bodyId = PhysicsAccess::BodyId(body);
         if (b2Body_IsValid(bodyId)) {
           b2Body_SetLinearVelocity(bodyId, b2Vec2{velocity.value.x, velocity.value.y});
@@ -306,9 +306,10 @@ void CreateStaticCollision(
         std::max(worldBounds.height * 0.5f, 0.5f));
     primaryShapeId = b2CreatePolygonShape(bodyId, &shapeDef, &box);
   } else {
-    std::vector<b2Vec2> points = shape == StaticCollisionShape::Ellipse
-                                     ? BuildEllipsePoints(worldBounds)
-                                     : BuildRelativePoints(worldPoints, center);
+    std::vector<b2Vec2> points =
+        shape == StaticCollisionShape::Ellipse
+            ? BuildEllipsePoints(worldBounds)
+            : BuildRelativePoints(worldPoints, center);
 
     b2ChainDef chainDef = b2DefaultChainDef();
     chainDef.points = points.data();

@@ -31,9 +31,9 @@ void RegisterCharacterAnimation(flecs::world &world) {
         }
       });
 
-  world.system<CharacterInfo, const Movement::Velocity>("Update Character Direction")
+  world.system<CharacterInfo, const Movement::RequestedVelocity>("Update Character Direction")
       .kind<Character::Phases::Update>()
-      .each([](CharacterInfo &info, const Movement::Velocity &velocity) {
+      .each([](CharacterInfo &info, const Movement::RequestedVelocity &velocity) {
         if (info.state == CharacterState::Dead) {
           return;
         }
