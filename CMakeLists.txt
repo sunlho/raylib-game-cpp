@@ -100,3 +100,17 @@ target_compile_definitions(CharacterPresentationTests PRIVATE
 )
 
 add_test(NAME CharacterPresentation COMMAND CharacterPresentationTests)
+
+add_executable(TilemapAnimationTests
+    tests/TilemapAnimationTests.cpp
+    src/modules/Tilemap/Tilemap.cpp
+    src/modules/Tilemap/TilemapChunks.cpp
+    src/modules/Tilemap/TilemapTextures.cpp
+)
+target_include_directories(TilemapAnimationTests PRIVATE src)
+target_link_libraries(TilemapAnimationTests PRIVATE raylib flecs::flecs_static tmxlite::tmxlite)
+target_compile_definitions(TilemapAnimationTests PRIVATE
+    ASSETS_PATH="${ASSETS_PATH}/"
+)
+
+add_test(NAME TilemapAnimation COMMAND TilemapAnimationTests)

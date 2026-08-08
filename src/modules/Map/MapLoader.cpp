@@ -146,6 +146,15 @@ TexturePreloadStats PreloadMapTexturesImpl(Tilemap::LoadedMap &loadedMap, std::s
       if (tileObject && !tileObject->texturePath.empty()) {
         texturePaths.insert(tileObject->texturePath);
       }
+      if (!tileObject) {
+        continue;
+      }
+      for (const auto &frame : tileObject->animation.frames) {
+        const auto *frameTile = loadedMap.textureBank->getTile(frame.tileGid);
+        if (frameTile && !frameTile->texturePath.empty()) {
+          texturePaths.insert(frameTile->texturePath);
+        }
+      }
     }
   }
 
@@ -199,6 +208,9 @@ void CommitLoadedMap(flecs::world &world, const Tilemap::LoadedMap &loadedMap, c
 
   auto &activeData = world.get_mut<ActiveMapData>();
   activeData.textureBank = loadedMap.textureBank;
+  if (activeData.textureBank) {
+    activeData.textureBank->resetAnimations();
+  }
   activeData.spawnPoints = loadedMap.spawnPoints;
   activeData.tileWidth = loadedMap.tileWidth;
   activeData.tileHeight = loadedMap.tileHeight;

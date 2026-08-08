@@ -25,17 +25,16 @@ struct ChunkTile {
   bool needsYSort = false;
 };
 
-struct ChunkAnimFrame {
-  std::uint32_t tileId = 0;
+struct TileAnimationFrame {
+  std::uint32_t tileGid = 0;
   float durationSeconds = 0.0f;
 };
 
-struct ChunkAnimTile {
-  std::size_t tileIndex = 0;
-  std::uint32_t currentFrame = 0;
-  std::uint32_t firstGid = 0;
-  float startTime = 0.0f;
-  std::vector<ChunkAnimFrame> frames;
+struct TileAnimation {
+  std::vector<TileAnimationFrame> frames;
+  std::size_t currentFrame = 0;
+  float elapsedSeconds = 0.0f;
+  float durationSeconds = 0.0f;
 };
 
 enum class CollisionShape {
@@ -66,7 +65,6 @@ struct Chunk {
   bool isCollision = false;
 
   std::vector<ChunkTile> tiles;
-  std::vector<ChunkAnimTile> animTiles;
   std::vector<CollisionData> collisions;
 
   bool isDirty = true;
@@ -78,6 +76,7 @@ struct TilemapTileObject {
   Rectangle srcRect = {0};
   int tileWidth = 0;
   int tileHeight = 0;
+  TileAnimation animation;
   std::vector<Tilemap::CollisionData> collisions;
   std::vector<tmx::Property> properties;
 };
@@ -95,6 +94,9 @@ struct TilemapTextureBank {
     auto it = tiles.find(gid);
     return it != tiles.end() ? &it->second : nullptr;
   }
+  const TilemapTileObject *getTileForRendering(std::uint32_t gid) const;
+  void updateAnimations(float deltaSeconds);
+  void resetAnimations();
   ~TilemapTextureBank();
 };
 

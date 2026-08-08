@@ -10,6 +10,7 @@
 #include "MapInternal.h"
 
 #include "modules/Camera.h"
+#include "modules/Core/Simulation.h"
 #include "modules/Rendering.h"
 #include "modules/Tilemap/Tilemap.h"
 
@@ -26,7 +27,7 @@ TileRenderable::TileRenderable(std::shared_ptr<const Tilemap::TilemapTextureBank
 // parameter only exists because Renderable::Draw is shared with entity-backed
 // renderables such as CharacterRenderable.
 void TileRenderable::Draw(const Core::Position &) const {
-  const auto tileObject = textureBank->getTile(tileGid);
+  const auto tileObject = textureBank->getTileForRendering(tileGid);
   if (!tileObject || tileObject->texturePath.empty()) {
     return;
   }
@@ -38,7 +39,7 @@ void TileRenderable::Draw(const Core::Position &) const {
 
   DrawTexturePro(
       *texture,
-      srcRect,
+      tileObject->srcRect,
       destRect,
       Vector2{0.0f, 0.0f},
       0.0f,
@@ -78,6 +79,15 @@ ChunkKey CameraCenterChunk(const ActiveMapData &activeData, const GameCamera::Ma
 void RegisterMapRendering(flecs::world &world) {
   auto sortScratch = std::make_shared<MapRenderScratch>();
 
+  world.system("Update Tile Animations")
+      .kind<Simulation::FixedUpdate>()
+      .run([](flecs::iter &it) {
+        auto &activeData = it.world().get_mut<ActiveMapData>();
+        if (activeData.textureBank) {
+          activeData.textureBank->updateAnimations(it.delta_time());
+        }
+      });
+
   world.system("Draw Static Chunks")
       .kind<Rendering::Phases::Background>()
       .run([](flecs::iter &it) {
@@ -100,7 +110,7 @@ void RegisterMapRendering(flecs::world &world) {
             }
 
             for (const auto &tile : keyIt->second) {
-              const auto tileObject = activeData.textureBank->getTile(tile.tileGid);
+              const auto tileObject = activeData.textureBank->getTileForRendering(tile.tileGid);
               if (!tileObject || tileObject->texturePath.empty()) {
                 continue;
               }
@@ -112,7 +122,7 @@ void RegisterMapRendering(flecs::world &world) {
 
               DrawTexturePro(
                   *texture,
-                  tile.srcRect,
+                  tileObject->srcRect,
                   tile.destRect,
                   Vector2{0.0f, 0.0f},
                   0.0f,

@@ -1,5 +1,6 @@
 #include "TilemapInternal.h"
 
+#include <cmath>
 #include <filesystem>
 
 #include "Tilemap.h"
@@ -39,6 +40,21 @@ std::shared_ptr<TilemapTextureBank> LoadTilesetTextures(const tmx::Map &tilemap,
       const auto tileSizeY = tileset.getTileSize().y;
       tileObject.tileWidth = static_cast<int>(tileSizeX ? tileSizeX : tile.imageSize.x);
       tileObject.tileHeight = static_cast<int>(tileSizeY ? tileSizeY : tile.imageSize.y);
+
+      const auto &animationFrames = tile.animation.frames;
+      tileObject.animation.frames.reserve(animationFrames.size());
+      for (const auto &frame : animationFrames) {
+        if (frame.duration == 0) {
+          TraceLog(LOG_WARNING, "Ignored zero-duration animation frame for tile GID %u", tileId);
+          continue;
+        }
+
+        const float durationSeconds = static_cast<float>(frame.duration) / 1000.0f;
+        tileObject.animation.frames.push_back(TileAnimationFrame{
+            frame.tileID,
+            durationSeconds});
+        tileObject.animation.durationSeconds += durationSeconds;
+      }
 
       const std::uint32_t localId = tile.ID;
       const int columnCount = static_cast<int>(tileset.getColumnCount());
@@ -111,6 +127,50 @@ Texture2D TilemapTextureBank::getOrLoadTexture(const std::string &path) {
   Texture2D texture = LoadTexture(texturePath.string().c_str());
   textureCache[path] = texture;
   return texture;
+}
+
+const TilemapTileObject *TilemapTextureBank::getTileForRendering(std::uint32_t gid) const {
+  const auto *tile = getTile(gid);
+  if (!tile || tile->animation.frames.empty() || tile->animation.currentFrame >= tile->animation.frames.size()) {
+    return tile;
+  }
+
+  const auto *frameTile = getTile(tile->animation.frames[tile->animation.currentFrame].tileGid);
+  return frameTile ? frameTile : tile;
+}
+
+void TilemapTextureBank::updateAnimations(float deltaSeconds) {
+  if (!(deltaSeconds > 0.0f)) {
+    return;
+  }
+
+  for (auto &[gid, tile] : tiles) {
+    (void)gid;
+    auto &animation = tile.animation;
+    if (animation.frames.empty() || !(animation.durationSeconds > 0.0f)) {
+      continue;
+    }
+
+    animation.elapsedSeconds = std::fmod(animation.elapsedSeconds + deltaSeconds, animation.durationSeconds);
+    float frameTime = animation.elapsedSeconds;
+    animation.currentFrame = 0;
+    for (std::size_t frameIndex = 0; frameIndex < animation.frames.size(); ++frameIndex) {
+      const float frameDuration = animation.frames[frameIndex].durationSeconds;
+      if (frameTime < frameDuration) {
+        animation.currentFrame = frameIndex;
+        break;
+      }
+      frameTime -= frameDuration;
+    }
+  }
+}
+
+void TilemapTextureBank::resetAnimations() {
+  for (auto &[gid, tile] : tiles) {
+    (void)gid;
+    tile.animation.currentFrame = 0;
+    tile.animation.elapsedSeconds = 0.0f;
+  }
 }
 
 TilemapTextureBank::~TilemapTextureBank() {
